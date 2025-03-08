@@ -1,0 +1,524 @@
+:root {
+  --primary: #6c63ff;
+  --secondary: #ff8c69;
+  --dark: #2a2a2a;
+  --light: #ffffff;
+  --background: #f9f9f9;
+  --text: #333333;
+  --text-light: #666666;
+  --border: #dddddd;
+}
+
+.dark-mode {
+  --primary: #8b80ff;
+  --secondary: #ff9f7f;
+  --dark: #f5f5f5;
+  --light: #1e1e1e;
+  --background: #121212;
+  --text: #f0f0f0;
+  --text-light: #aaaaaa;
+  --border: #444444;
+}
+
+/* Base Styles */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: var(--background);
+  color: var(--text);
+  transition: background-color 0.3s, color 0.3s;
+  overflow: hidden;
+  position: relative;
+}
+
+body.dark-mode {
+  background-color: var(--background);
+  color: var(--text);
+}
+
+/* Dynamic background with notes */
+.bg-notes {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.bg-note {
+  position: absolute;
+  font-size: 3rem;
+  color: rgba(108, 99, 255, 0.1);
+  transition: color 0.3s, transform 0.3s;
+  pointer-events: auto;
+  user-select: none;
+  animation: float-around 20s infinite linear;
+}
+
+.dark-mode .bg-note {
+  color: rgba(139, 128, 255, 0.1);
+}
+
+.bg-note:hover {
+  color: rgba(108, 99, 255, 0.7);
+  transform: scale(1.2) rotate(10deg);
+  z-index: 1;
+}
+
+.dark-mode .bg-note:hover {
+  color: rgba(139, 128, 255, 0.7);
+}
+
+@keyframes float-around {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  25% {
+    transform: translate(100px, -100px) rotate(90deg);
+  }
+  50% {
+    transform: translate(200px, 0) rotate(180deg);
+  }
+  75% {
+    transform: translate(100px, 100px) rotate(270deg);
+  }
+  100% {
+    transform: translate(0, 0) rotate(360deg);
+  }
+}
+
+/* Container centered */
+.container {
+  display: flex;
+  min-height: 100vh;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+  position: relative;
+  z-index: 1;
+}
+
+/* Main box containing both sections */
+.content-box {
+  display: flex;
+  width: 900px;
+  max-width: 90%;
+  min-height: 600px;
+  background-color: var(--light);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.dark-mode .content-box {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+/* Login Form Section */
+.login-form {
+  flex: 1;
+  padding: 3rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  background: var(--light);
+}
+
+.mode-toggle {
+  position: absolute;
+  top: 2rem;
+  right: 2rem;
+}
+
+.toggle-btn {
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.toggle-btn:hover {
+  transform: scale(1.1);
+}
+
+/* Graphic Section */
+.graphic {
+  flex: 1;
+  background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+  color: white;
+}
+
+.graphic::before {
+  content: '';
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  top: -100px;
+  right: -100px;
+}
+
+.graphic::after {
+  content: '';
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  bottom: -50px;
+  left: -50px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 2rem;
+}
+
+.logo-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #6a11cb;
+  border-radius: 8px;
+  color: white;
+}
+
+.logo-text {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+p.subtitle {
+  color: var(--text-light);
+  margin-bottom: 2rem;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"] {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--light);
+  font-size: 1rem;
+  transition: border-color 0.3s;
+  color: var(--text);
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus {
+  border-color: var(--primary);
+  outline: none;
+}
+
+.options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+}
+
+.remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.forgot {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.submit-btn {
+  width: 100%;
+  padding: 0.8rem;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.3s, transform 0.2s;
+  margin-bottom: 1.5rem;
+}
+
+.submit-btn:hover {
+  background: #5711a7;
+  transform: translateY(-2px);
+}
+
+.submit-btn:active {
+  transform: translateY(0);
+}
+
+.separator {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 1.5rem;
+  color: var(--text-light);
+  font-size: 0.9rem;
+}
+
+.separator::before,
+.separator::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid var(--border);
+}
+
+.separator:not(:empty)::before {
+  margin-right: 1rem;
+}
+
+.separator:not(:empty)::after {
+  margin-left: 1rem;
+}
+
+.social-login {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 2rem;
+}
+
+.social-btn {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.social-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  transform: translateY(-3px);
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.1);
+}
+
+.dark-mode .social-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.3);
+}
+
+.signup-link {
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.signup-link a {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.signup-link a:hover {
+  text-decoration: underline;
+}
+
+.wave-svg {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  color: white;
+}
+
+.graphic-content {
+  position: relative;
+  z-index: 1;
+  max-width: 80%;
+  padding: 2rem;
+  text-align: center;
+}
+
+.graphic-content h2 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+
+.graphic-content p {
+  font-size: 1.1rem;
+  opacity: 0.9;
+  line-height: 1.6;
+}
+
+.music-notes {
+  position: absolute;
+  font-size: 2rem;
+  color: rgba(255, 255, 255, 0.8);
+  animation: float 6s infinite ease-in-out;
+  transition: all 0.3s;
+}
+
+.music-notes:hover {
+  color: rgba(255, 255, 255, 1);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+  transform: scale(1.2);
+}
+
+.note1 {
+  top: 20%;
+  left: 20%;
+  animation-delay: 0s;
+}
+
+.note2 {
+  top: 30%;
+  right: 30%;
+  animation-delay: 1.5s;
+}
+
+.note3 {
+  bottom: 40%;
+  left: 25%;
+  animation-delay: 3s;
+}
+
+.note4 {
+  bottom: 30%;
+  right: 20%;
+  animation-delay: 4.5s;
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translateY(-20px) rotate(10deg);
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0.8;
+  }
+}
+
+/* Text button styling for links that look like buttons */
+.text-btn {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.9rem;
+  transition: color 0.2s;
+}
+
+.text-btn:hover {
+  color: #5711a7;
+  text-decoration: underline;
+}
+
+/* Form switch at bottom */
+.form-switch {
+  text-align: center;
+  font-size: 0.9rem;
+  margin-top: 1.5rem;
+}
+
+/* Back arrow for forgot password form */
+.back-arrow {
+  margin-right: 0.5rem;
+}
+
+/* Google button styling */
+.google-btn {
+  width: auto;
+  padding: 0 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.google-btn span {
+  font-weight: 500;
+}
+
+/* Form transitions */
+.login-form form {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 768px) {
+  .content-box {
+    flex-direction: column;
+    height: auto;
+  }
+  
+  .login-form {
+    padding: 2rem;
+    width: 100%;
+  }
+  
+  .graphic {
+    display: none;
+  }
+  
+  .mode-toggle {
+    top: 1rem;
+    right: 1rem;
+  }
+}
