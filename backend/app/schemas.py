@@ -82,3 +82,35 @@ class SavedMelody(SavedMelodyBase):
     
     class Config:
         orm_mode = True
+
+# Add these new schemas
+
+class ExperimentBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    max_generations: int = 1000
+
+class ExperimentCreate(ExperimentBase):
+    pass
+
+class ExperimentUpdate(BaseModel):
+    current_generation: Optional[int] = None
+    best_score: Optional[float] = None
+    completed: Optional[bool] = None
+    final_piece_name: Optional[str] = None
+    final_genome_id: Optional[int] = None
+
+class ExperimentInDB(ExperimentBase):
+    id: int
+    current_generation: int
+    best_score: float
+    completed: bool
+    final_piece_name: Optional[str] = None
+    final_genome_id: Optional[int] = None
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
+
+class Experiment(ExperimentInDB):
+    total_contributions: int = 0

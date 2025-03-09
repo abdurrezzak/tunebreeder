@@ -1,50 +1,94 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import * as Tone from 'tone';
 import './HomePage.css';
+import ExperimentSelection from './components/ExperimentSelection';
+
+// --- MelodyCard Component ---
+// Displays a saved melody using useMemo at the top level.
+const MelodyCard = ({ melody, isPlaying, currentPlayingId, stopPlaying, playMelody }) => {
+  const barHeights = useMemo(
+    () => Array.from({ length: 8 }, () => 10 + Math.random() * 30),
+    [melody.id]
+  );
+
+  return (
+    <div className="melody-card">
+      <h3>{melody.name}</h3>
+      <p className="melody-description">{melody.description || 'No description'}</p>
+      <div className="melody-info">
+        <span>
+          <i className="fas fa-layer-group"></i> Gen {melody.genome.generation}
+        </span>
+        <span>
+          <i className="fas fa-star"></i> {Math.round(melody.genome.score)}/100
+        </span>
+      </div>
+      <div className="melody-minivis">
+        {barHeights.map((height, i) => (
+          <div key={i} className="mini-bar" style={{ height: `${height}px` }}></div>
+        ))}
+      </div>
+      <button
+        className={`play-btn ${isPlaying && currentPlayingId === melody.id ? 'playing' : ''}`}
+        onClick={() =>
+          isPlaying && currentPlayingId === melody.id
+            ? stopPlaying()
+            : playMelody(melody.genome.data, melody.id)
+        }
+      >
+        {isPlaying && currentPlayingId === melody.id ? (
+          <>
+            <i className="fas fa-stop"></i> Stop
+          </>
+        ) : (
+          <>
+            <i className="fas fa-play"></i> Play
+          </>
+        )}
+      </button>
+    </div>
+  );
+};
 
 const HomePage = () => {
   // --- Test Melody (Für Elise, simplified) ---
   const famousMelody = [
-    // Phrase 1
-    { pitch: 76, duration: 0.5, velocity: 80 }, // E5
-    { pitch: 75, duration: 0.5, velocity: 80 }, // D#5
-    { pitch: 76, duration: 0.5, velocity: 80 }, // E5
-    { pitch: 75, duration: 0.5, velocity: 80 }, // D#5
-    { pitch: 76, duration: 0.5, velocity: 80 }, // E5
-    { pitch: 71, duration: 0.5, velocity: 80 }, // B4
-    { pitch: 74, duration: 0.5, velocity: 80 }, // D5
-    { pitch: 72, duration: 0.5, velocity: 80 }, // C5
-    { pitch: 69, duration: 0.75, velocity: 80 }, // A4
-    // Phrase 2
-    { pitch: 69, duration: 0.5, velocity: 80 }, // A4
-    { pitch: 60, duration: 0.5, velocity: 80 }, // C4
-    { pitch: 64, duration: 0.5, velocity: 80 }, // E4
-    { pitch: 69, duration: 1.0, velocity: 80 }, // A4
-    // Phrase 3
-    { pitch: 71, duration: 0.5, velocity: 80 }, // B4
-    { pitch: 64, duration: 0.5, velocity: 80 }, // E4
-    { pitch: 68, duration: 0.5, velocity: 80 }, // G#4
-    { pitch: 71, duration: 1.0, velocity: 80 }, // B4
-    { pitch: 64, duration: 0.5, velocity: 80 }, // E4
-    { pitch: 60, duration: 0.5, velocity: 80 }, // C4
-    { pitch: 59, duration: 0.5, velocity: 80 }, // B3
-    { pitch: 57, duration: 1.0, velocity: 80 }, // A3
-    // Phrase 4 (final phrase)
-    { pitch: 64, duration: 0.5, velocity: 80 }, // E4
-    { pitch: 64, duration: 0.5, velocity: 80 }, // E4
-    { pitch: 65, duration: 0.5, velocity: 80 }, // F4
-    { pitch: 67, duration: 0.5, velocity: 80 }, // G4
-    { pitch: 67, duration: 0.5, velocity: 80 }, // G4
-    { pitch: 65, duration: 0.5, velocity: 80 }, // F4
-    { pitch: 64, duration: 0.5, velocity: 80 }, // E4
-    { pitch: 62, duration: 0.5, velocity: 80 }, // D4
-    { pitch: 60, duration: 0.5, velocity: 80 }, // C4
-    { pitch: 60, duration: 0.5, velocity: 80 }, // C4
-    { pitch: 62, duration: 0.5, velocity: 80 }, // D4
-    { pitch: 64, duration: 0.5, velocity: 80 }, // E4
-    { pitch: 62, duration: 0.75, velocity: 80 }, // D4 (dotted quarter)
-    { pitch: 60, duration: 0.25, velocity: 80 }, // C4 (eighth)
-    { pitch: 60, duration: 1.0, velocity: 80 }   // C4 (half)
+    { pitch: 76, duration: 0.5, velocity: 80 },
+    { pitch: 75, duration: 0.5, velocity: 80 },
+    { pitch: 76, duration: 0.5, velocity: 80 },
+    { pitch: 75, duration: 0.5, velocity: 80 },
+    { pitch: 76, duration: 0.5, velocity: 80 },
+    { pitch: 71, duration: 0.5, velocity: 80 },
+    { pitch: 74, duration: 0.5, velocity: 80 },
+    { pitch: 72, duration: 0.5, velocity: 80 },
+    { pitch: 69, duration: 0.75, velocity: 80 },
+    { pitch: 69, duration: 0.5, velocity: 80 },
+    { pitch: 60, duration: 0.5, velocity: 80 },
+    { pitch: 64, duration: 0.5, velocity: 80 },
+    { pitch: 69, duration: 1.0, velocity: 80 },
+    { pitch: 71, duration: 0.5, velocity: 80 },
+    { pitch: 64, duration: 0.5, velocity: 80 },
+    { pitch: 68, duration: 0.5, velocity: 80 },
+    { pitch: 71, duration: 1.0, velocity: 80 },
+    { pitch: 64, duration: 0.5, velocity: 80 },
+    { pitch: 60, duration: 0.5, velocity: 80 },
+    { pitch: 59, duration: 0.5, velocity: 80 },
+    { pitch: 57, duration: 1.0, velocity: 80 },
+    { pitch: 64, duration: 0.5, velocity: 80 },
+    { pitch: 64, duration: 0.5, velocity: 80 },
+    { pitch: 65, duration: 0.5, velocity: 80 },
+    { pitch: 67, duration: 0.5, velocity: 80 },
+    { pitch: 67, duration: 0.5, velocity: 80 },
+    { pitch: 65, duration: 0.5, velocity: 80 },
+    { pitch: 64, duration: 0.5, velocity: 80 },
+    { pitch: 62, duration: 0.5, velocity: 80 },
+    { pitch: 60, duration: 0.5, velocity: 80 },
+    { pitch: 60, duration: 0.5, velocity: 80 },
+    { pitch: 62, duration: 0.5, velocity: 80 },
+    { pitch: 64, duration: 0.5, velocity: 80 },
+    { pitch: 62, duration: 0.75, velocity: 80 },
+    { pitch: 60, duration: 0.25, velocity: 80 },
+    { pitch: 60, duration: 1.0, velocity: 80 }
   ];
 
   // --- State Variables ---
@@ -64,6 +108,7 @@ const HomePage = () => {
   const [selectedIndices, setSelectedIndices] = useState([]);
   const [samplerLoaded, setSamplerLoaded] = useState(false);
   const [currentPlayingId, setCurrentPlayingId] = useState(null);
+  const [showExperimentSelection, setShowExperimentSelection] = useState(true);
 
   // --- Refs ---
   const audioContextRef = useRef(null);
@@ -74,6 +119,7 @@ const HomePage = () => {
   const toggleDarkMode = () => {
     setDarkMode(!darkMode);
   };
+
   useEffect(() => {
     if (darkMode) {
       document.body.classList.add('dark-mode');
@@ -138,7 +184,6 @@ const HomePage = () => {
         createFallbackSynth();
       }
     }).toDestination();
-
     return () => {
       if (samplerRef.current) {
         samplerRef.current.dispose();
@@ -300,7 +345,8 @@ const HomePage = () => {
     }
   };
 
-  // Improved playMelody using Tone.Transport for accurate timing
+  // Improved playMelody using Tone.Transport for accurate timing.
+  // This function is used for both the current melody and external melodies.
   const playMelody = async (genomeData, melodyId = null) => {
     stopPlaying();
     try {
@@ -320,17 +366,25 @@ const HomePage = () => {
     const notes = genomeToNotes(genomeData);
     if (!notes.length) return;
     
+    // Update global state for playback.
     setIsPlaying(true);
     setCurrentPlayingId(melodyId);
     currentNoteRef.current = 0;
-    setPlayingIndex(0);
-
+    
+    // For the current genome, we want to show progress.
+    // For external melodies, playingIndex will not be used in the middle column.
+    if (melodyId === currentGenome?.id) {
+      setPlayingIndex(0);
+    }
+    
     Tone.Transport.cancel();
     Tone.Transport.stop();
     let cumulativeTime = 0;
     notes.forEach((note, index) => {
-      Tone.Transport.scheduleOnce((time) => {
-        setPlayingIndex(index);
+      Tone.Transport.scheduleOnce(() => {
+        if (melodyId === currentGenome?.id) {
+          setPlayingIndex(index);
+        }
         playNote(note);
       }, cumulativeTime);
       cumulativeTime += note.duration;
@@ -353,6 +407,7 @@ const HomePage = () => {
   // --- Mutation and Save Functions ---
   const submitMutation = async (mutatedGenomeArray, score) => {
     const token = localStorage.getItem('token');
+    const mutationData = JSON.stringify(mutatedGenomeArray);
     const response = await fetch(`http://localhost:8000/api/genome/${currentGenome.id}/mutate`, {
       method: 'POST',
       headers: {
@@ -361,7 +416,7 @@ const HomePage = () => {
       },
       body: JSON.stringify({
         genome_id: currentGenome.id,
-        mutation_data: JSON.stringify(mutatedGenomeArray),
+        mutation_data: mutationData,
         score: score,
       }),
     });
@@ -369,6 +424,7 @@ const HomePage = () => {
       const errorText = await response.text();
       throw new Error(`Failed to mutate genome: ${errorText}`);
     }
+    return await response.json();
   };
 
   const handleAdvancedMutation = async (mutatedGenome) => {
@@ -384,6 +440,7 @@ const HomePage = () => {
       setSelectedIndices([]);
       await fetchCurrentGenome();
       fetchLeaderboard();
+      alert('Mutation submitted successfully!');
     } catch (err) {
       console.error('Error mutating genome:', err);
       alert(`Mutation failed: ${err.message}`);
@@ -415,6 +472,7 @@ const HomePage = () => {
       setScoreSubmitted(false);
       await fetchCurrentGenome();
       fetchLeaderboard();
+      alert('Mutation submitted successfully!');
     } catch (err) {
       console.error('Error mutating genome:', err);
       alert(`Mutation failed: ${err.message}`);
@@ -468,6 +526,11 @@ const HomePage = () => {
     });
   };
 
+  const handleSelectGenome = (genome) => {
+    setCurrentGenome(genome);
+    setShowExperimentSelection(false);
+  };
+
   if (loading && !user) {
     return (
       <div className="loading-container">
@@ -494,22 +557,20 @@ const HomePage = () => {
       <header className="app-header">
         <div className="logo">
           <div className="logo-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <path d="M9 19V5L21 3V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <circle cx="6" cy="19" r="3" stroke="currentColor" strokeWidth="2" />
-              <circle cx="18" cy="17" r="3" stroke="currentColor" strokeWidth="2" />
-            </svg>
+            <i className="fas fa-music"></i>
           </div>
           <h1>TuneBreeder</h1>
         </div>
         <div className="user-controls">
           <button className="theme-toggle" onClick={toggleDarkMode}>
-            {darkMode ? '☀️' : '🌙'}
+            {darkMode ? <i className="fas fa-sun"></i> : <i className="fas fa-moon"></i>}
           </button>
           <div className="user-info">
-            <span>Welcome, {user?.username}</span>
+            <span>
+              <i className="fas fa-user"></i> {user?.username}
+            </span>
             <button className="logout-btn" onClick={handleLogout}>
-              Logout
+              <i className="fas fa-sign-out-alt"></i> Logout
             </button>
           </div>
         </div>
@@ -517,217 +578,235 @@ const HomePage = () => {
 
       {/* MAIN CONTENT */}
       <main className="app-content">
-        {/* Current Melody (Full width) */}
-        <section className="current-genome">
-          <h2>Current Melody</h2>
-          <div className="genome-card">
-            {currentGenome ? (
-              <>
-                <GenomeTitle genome={currentGenome} />
-                <div className="genome-info">
-                  <p>Generation: {currentGenome.generation}</p>
-                  <p>Score: {Math.round(currentGenome.score)}/100</p>
-                </div>
-
-                {/* StickRoll visualization */}
-                <StickRoll
-                  notes={genomeToNotes(currentGenome.data)}
-                  playingIndex={playingIndex}
-                  selectedIndices={selectedIndices}
-                  onToggleNote={handleToggleNote}
-                />
-
-                <div className="genome-controls">
-                  <button
-                    className={`action-btn play ${isPlaying ? 'playing' : ''}`}
-                    onClick={() =>
-                      isPlaying ? stopPlaying() : playMelody(currentGenome.data)
-                    }
-                    disabled={!samplerLoaded}
-                  >
-                    <span>{isPlaying ? '■' : '▶'}</span> {isPlaying ? 'Stop' : samplerLoaded ? 'Play' : 'Loading sounds...'}
-                  </button>
-                  <button className="action-btn save" onClick={saveMelody}>
-                    <span>❤</span> Save
-                  </button>
-                </div>
-
-                {/* Mutation controls (disabled until score is submitted) */}
-                <MutationControls
-                  genome={currentGenome}
-                  selectedIndices={selectedIndices}
-                  onMutate={handleAdvancedMutation}
-                />
-
-                {/* Score slider */}
-                <ScoreSlider onRate={handleRateGenome} initialValue={userRating || 50} />
-                {userRating !== null && (
-                  <p className="user-rating">Your rating: {userRating}/100</p>
+        {showExperimentSelection ? (
+          <ExperimentSelection onSelectGenome={handleSelectGenome} />
+        ) : (
+          <div className="three-column-layout">
+            {/* Left Column: Saved Melodies and Leaderboard */}
+            <div className="left-column">
+              <section className="saved-melodies">
+                <h2>
+                  <span className="section-icon">💾</span> Your Saved Melodies
+                </h2>
+                {savedMelodies.length > 0 ? (
+                  <div className="melodies-grid">
+                    {savedMelodies.map((melody) => (
+                      <MelodyCard
+                        key={melody.id}
+                        melody={melody}
+                        isPlaying={isPlaying}
+                        currentPlayingId={currentPlayingId}
+                        stopPlaying={stopPlaying}
+                        playMelody={playMelody}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="no-melodies">
+                    <i className="fas fa-music melody-icon"></i>
+                    <p>You haven't saved any melodies yet.</p>
+                    <p>Start by exploring and saving melodies you like!</p>
+                  </div>
                 )}
+              </section>
 
-                {/* Mutate button is disabled until a score is submitted */}
-                <button
-                  className="action-btn mutate-random"
-                  onClick={mutateGenome}
-                  disabled={!scoreSubmitted || isMutating}
-                >
-                  Random Mutate (All)
-                </button>
-              </>
-            ) : (
-              <div className="no-genome">
-                <p>No melody available at the moment</p>
-                <button className="action-btn" onClick={fetchCurrentGenome}>
-                  Refresh
-                </button>
-              </div>
-            )}
-          </div>
-        </section>
-        
-        {/* Two-column layout for saved melodies and leaderboard */}
-        <div className="main-grid">
-          <section className="saved-melodies">
-            <h2>Your Saved Melodies</h2>
-            {savedMelodies.length > 0 ? (
-              <div className="melodies-grid">
-                {savedMelodies.map((melody) => (
-                  <div key={melody.id} className="melody-card">
-                    <h3>{melody.name}</h3>
-                    <p className="melody-description">{melody.description || 'No description'}</p>
-                    <div className="melody-info">
-                      <span>Generation: {melody.genome.generation}</span>
-                      <span>Score: {Math.round(melody.genome.score)}/100</span>
+              {/* Leaderboard Section */}
+              <section className="leaderboard">
+                <h2>
+                  <span className="section-icon">🏆</span> Leaderboard
+                </h2>
+                <div className="leaderboard-content">
+                  {leaderboard.length > 0 ? (
+                    leaderboard.map((entry, index) => (
+                      <div key={entry.id} className="leaderboard-entry">
+                        <div className="leaderboard-rank">#{index + 1}</div>
+                        <div className="user-avatar">
+                          {entry.username.substring(0, 2).toUpperCase()}
+                        </div>
+                        <div className="leaderboard-info">
+                          <div className="leaderboard-name">{entry.username}</div>
+                          <div className="leaderboard-stats">
+                            <i className="fas fa-lightbulb contribution-icon"></i>
+                            <span className="contribution-count">{entry.contribution_count}</span> contributions
+                          </div>
+                        </div>
+                        {index < 3 && (
+                          <div className={`trophy trophy-${index + 1}`}>
+                            {index === 0 ? (
+                              <i className="fas fa-crown gold"></i>
+                            ) : index === 1 ? (
+                              <i className="fas fa-medal silver"></i>
+                            ) : (
+                              <i className="fas fa-award bronze"></i>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <p>
+                      <i className="fas fa-hourglass-half"></i> No contributions yet.
+                    </p>
+                  )}
+                </div>
+              </section>
+            </div>
+
+            {/* Middle Column: Current Melody */}
+            <div className="middle-column">
+              <section className="current-genome">
+                <h2>Current Melody</h2>
+                <div className="genome-card">
+                  {currentGenome ? (
+                    <>
+                      <div className="genome-actions">
+                        <button className="back-btn" onClick={() => setShowExperimentSelection(true)}>
+                          <i className="fas fa-chevron-left"></i> Back to Experiments
+                        </button>
+                      </div>
+
+                      <GenomeTitle genome={currentGenome} />
+
+                      <div className="genome-info">
+                        <p>
+                          <i className="fas fa-layer-group"></i> Generation: {currentGenome.generation}
+                        </p>
+                        <p>
+                          <i className="fas fa-chart-bar"></i> Score: {Math.round(currentGenome.score)}/100
+                        </p>
+                      </div>
+
+                      {/* Only show StickRoll progress if the current genome is playing */}
+                      <StickRoll
+                        notes={genomeToNotes(currentGenome.data)}
+                        playingIndex={currentPlayingId === currentGenome.id ? playingIndex : -1}
+                        selectedIndices={selectedIndices}
+                        onToggleNote={handleToggleNote}
+                      />
+
+                      <div className="genome-controls">
+                        {/* Play and Save buttons in a flex container */}
+                        <div className="play-save-container" style={{ display: "flex", gap: "1rem" }}>
+                          <button
+                            className={`action-btn play ${isPlaying && currentPlayingId === currentGenome.id ? 'playing' : ''}`}
+                            onClick={() =>
+                              isPlaying && currentPlayingId === currentGenome.id
+                                ? stopPlaying()
+                                : playMelody(currentGenome.data, currentGenome.id)
+                            }
+                            disabled={!samplerLoaded}
+                          >
+                            {isPlaying && currentPlayingId === currentGenome.id ? (
+                              <>
+                                <i className="fas fa-stop"></i> Stop
+                              </>
+                            ) : (
+                              <>
+                                <i className="fas fa-play"></i> {samplerLoaded ? 'Play' : 'Loading sounds...'}
+                              </>
+                            )}
+                          </button>
+                          <button className="action-btn save" onClick={saveMelody}>
+                            <i className="fas fa-heart"></i> Save
+                          </button>
+                        </div>
+
+                        {/* Rate this melody appears before advanced mutation controls */}
+                        <ScoreSlider onRate={handleRateGenome} initialValue={userRating || 50} />
+                        {userRating !== null && (
+                          <p className="user-rating">Your rating: {userRating}/100</p>
+                        )}
+
+                        <MutationControls
+                          genome={currentGenome}
+                          selectedIndices={selectedIndices}
+                          onMutate={handleAdvancedMutation}
+                        />
+
+                        <button
+                          className="action-btn mutate-random"
+                          onClick={mutateGenome}
+                          disabled={!scoreSubmitted || isMutating}
+                        >
+                          <i className="fas fa-random"></i> Random Mutate (All)
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="no-genome">
+                      <p>No melody available at the moment</p>
+                      <button className="action-btn" onClick={() => setShowExperimentSelection(true)}>
+                        Return to Experiment Selection
+                      </button>
                     </div>
-                    <div className="melody-minivis">
-                      {Array.from({ length: 8 }).map((_, i) => (
-                        <div
-                          key={i}
-                          className="mini-bar"
-                          style={{ height: `${10 + Math.random() * 30}px` }}
-                        ></div>
+                  )}
+                </div>
+              </section>
+            </div>
+
+            {/* Right Column: Latest Community Melodies */}
+            <div className="right-column">
+              {/* Latest Community Melodies Section */}
+              <section className="latest-playlist">
+                <h2>
+                  <span className="section-icon">📻</span> Latest Community Melodies
+                </h2>
+                <div className="playlist-container">
+                  {latestPlaylist.length > 0 ? (
+                    <div className="playlist-tracks">
+                      {latestPlaylist.map((melody) => (
+                        <div key={melody.id} className="playlist-track">
+                          <div
+                            className="track-play-btn"
+                            onClick={() => {
+                              if (isPlaying && currentPlayingId === melody.id) {
+                                stopPlaying();
+                              } else {
+                                playMelody(melody.genome.data, melody.id);
+                              }
+                            }}
+                          >
+                            {isPlaying && currentPlayingId === melody.id ? (
+                              <div className="equalizer">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                              </div>
+                            ) : (
+                              <i className="fas fa-play"></i>
+                            )}
+                          </div>
+                          <div className="track-info">
+                            <div className="track-title">{melody.name}</div>
+                            <div className="track-artist">
+                              <i className="fas fa-user"></i> {melody.username}
+                            </div>
+                          </div>
+                          <div className="track-meta">
+                            <span className="track-generation">
+                              <i className="fas fa-dna"></i> Gen {melody.genome.generation}
+                            </span>
+                            <span className="track-rating">
+                              <span className="rating-value">{Math.round(melody.genome.score)}</span>
+                              <i className="fas fa-star rating-icon"></i>
+                            </span>
+                          </div>
+                        </div>
                       ))}
                     </div>
-                    <button
-                      className={`play-btn ${isPlaying ? 'playing' : ''}`}
-                      onClick={() => isPlaying ? stopPlaying() : playMelody(melody.genome.data)}
-                    >
-                      {isPlaying ? '■ Stop' : '▶ Play'}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="no-melodies">
-                <p>You haven't saved any melodies yet.</p>
-                <p>Start by exploring and saving melodies you like!</p>
-              </div>
-            )}
-          </section>
-          
-          {/* Leaderboard moved to the right */}
-          <section className="leaderboard">
-            <h2>Leaderboard</h2>
-            <div className="leaderboard-content">
-              {leaderboard.length > 0 ? (
-                leaderboard.map((entry, index) => (
-                  <div key={entry.id} className="leaderboard-entry">
-                    <div className="leaderboard-rank">#{index + 1}</div>
-                    <div className="user-avatar">{entry.username.substring(0, 2).toUpperCase()}</div>
-                    <div className="leaderboard-info">
-                      <div className="leaderboard-name">{entry.username}</div>
-                      <div className="leaderboard-stats">
-                        <span className="contribution-count">{entry.contribution_count}</span> contributions
-                      </div>
+                  ) : (
+                    <div className="empty-playlist">
+                      <i className="fas fa-music empty-playlist-icon"></i>
+                      <p>No melodies have been saved yet.</p>
+                      <p>Be the first to save a melody to the community playlist!</p>
                     </div>
-                    {index < 3 && <div className={`trophy trophy-${index + 1}`}>🏆</div>}
-                  </div>
-                ))
-              ) : (
-                <p>No contributions yet.</p>
-              )}
-            </div>
-          </section>
-        </div>
-        
-        {/* Enhanced playlist section (Full width) */}
-        <section className="latest-playlist">
-          <h2>Latest Community Melodies</h2>
-          <div className="playlist-container">
-            {latestPlaylist.length > 0 ? (
-              <div className="playlist-tracks">
-                {latestPlaylist.map((melody) => (
-                  <div key={melody.id} className="playlist-track">
-                    <div className="track-play-btn" 
-                         onClick={() => {
-                           if (isPlaying && currentPlayingId === melody.id) {
-                             stopPlaying();
-                           } else {
-                             playMelody(melody.genome.data, melody.id);
-                           }
-                         }}>
-                      {isPlaying && currentPlayingId === melody.id ? (
-                        <div className="equalizer">
-                          <span></span><span></span><span></span><span></span>
-                        </div>
-                      ) : (
-                        <span className="play-icon">▶</span>
-                      )}
-                    </div>
-                    <div className="track-info">
-                      <div className="track-title">{melody.name}</div>
-                      <div className="track-artist">by {melody.username}</div>
-                    </div>
-                    <div className="track-meta">
-                      <span className="track-generation">Gen {melody.genome.generation}</span>
-                      <span className="track-rating">
-                        <span className="rating-value">{Math.round(melody.genome.score)}</span>
-                        <span className="rating-icon">★</span>
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="empty-playlist">
-                <div className="empty-playlist-icon">🎵</div>
-                <p>No melodies have been saved yet.</p>
-                <p>Be the first to save a melody to the community playlist!</p>
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* Community section */}
-        <section className="community-section">
-          <h2>Community Activity</h2>
-          <div className="community-feed">
-            <div className="activity-card">
-              <div className="activity-user">
-                <div className="user-avatar">JD</div>
-                <span>JohnDoe</span>
-              </div>
-              <p>Created an amazing melody with generation 3 genome!</p>
-              <span className="activity-time">2 hours ago</span>
-            </div>
-            <div className="activity-card">
-              <div className="activity-user">
-                <div className="user-avatar">AS</div>
-                <span>AliceSmith</span>
-              </div>
-              <p>Mutated a melody to achieve a score of 92!</p>
-              <span className="activity-time">5 hours ago</span>
-            </div>
-            <div className="activity-card">
-              <div className="activity-user">
-                <div className="user-avatar">RJ</div>
-                <span>RobertJohnson</span>
-              </div>
-              <p>Saved "Blues Evolution" - a generation 5 melody</p>
-              <span className="activity-time">1 day ago</span>
+                  )}
+                </div>
+              </section>
             </div>
           </div>
-        </section>
+        )}
       </main>
 
       {/* FOOTER */}
@@ -754,81 +833,60 @@ const GenomeTitle = ({ genome }) => (
   </div>
 );
 
+/* 
+  New StickRoll component that displays notes in a flex-wrapped container.
+  The notes are arranged line by line (vertically) instead of one long horizontal line.
+*/
 const StickRoll = ({ notes = [], playingIndex, selectedIndices, onToggleNote }) => {
-  const containerRef = useRef(null);
-  const activeNoteRef = useRef(null);
-  const DURATION_SCALE = 80;
-  const PITCH_SCALE = 2;
-  const BASE_TOP = 200;
-  const BASE_HEIGHT = 20;
-  const MIN_PITCH = 36;
-  const MAX_PITCH = 96;
-  let cumulativeX = 0;
-
-  useEffect(() => {
-    if (playingIndex >= 0 && containerRef.current && activeNoteRef.current) {
-      const container = containerRef.current;
-      const activeNote = activeNoteRef.current;
-      const noteLeft = activeNote.offsetLeft;
-      const noteWidth = activeNote.offsetWidth;
-      const containerScrollLeft = container.scrollLeft;
-      const containerWidth = container.clientWidth;
-      if (noteLeft < containerScrollLeft || noteLeft + noteWidth > containerScrollLeft + containerWidth) {
-        const scrollTo = noteLeft - (containerWidth / 2) + (noteWidth / 2);
-        container.scrollTo({ left: Math.max(0, scrollTo), behavior: 'smooth' });
-      }
-    }
-  }, [playingIndex]);
+  const DURATION_SCALE = 80; // scale factor for width
+  const BASE_HEIGHT = 20; // fixed height for each note
 
   return (
     <div
-      ref={containerRef}
       className="stickroll-container"
       style={{
-        position: 'relative',
-        width: '100%',
-        height: '300px',
-        border: '1px solid #ccc',
-        overflowX: 'auto',
-        overflowY: 'hidden',
-        marginBottom: '1rem',
-        background: 'rgba(250, 245, 255, 0.5)'
+        display: "flex",
+        flexWrap: "wrap",
+        gap: "5px",
+        maxHeight: "250px",
+        overflowY: "auto",
+        overflowX: "hidden",
+        padding: "10px",
+        background: "rgba(250, 245, 255, 0.5)"
       }}
     >
       {notes.map((note, i) => {
         const pitch = note.pitch ?? Math.round(note.frequency ?? 60);
         const duration = note.duration ?? 0.5;
         const velocity = note.velocity ?? 80;
+        // Compute color based on pitch
+        const MIN_PITCH = 36;
+        const MAX_PITCH = 96;
         const clampedPitch = Math.min(MAX_PITCH, Math.max(MIN_PITCH, pitch));
         const normalizedPitch = (clampedPitch - MIN_PITCH) / (MAX_PITCH - MIN_PITCH);
         const hue = 260 + normalizedPitch * 20;
         const saturation = 70 + normalizedPitch * 30;
         const lightness = 30 + (1 - normalizedPitch) * 30;
-        const color = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+        const backgroundColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
         const barWidth = duration * DURATION_SCALE;
-        const left = cumulativeX;
-        cumulativeX += barWidth + 5;
-        const top = BASE_TOP - pitch * PITCH_SCALE;
         const isPlaying = i === playingIndex;
-        const backgroundColor = isPlaying ? 'rgb(153, 51, 255)' : color;
         const isSelected = selectedIndices.includes(i);
-        const border = isSelected ? '2px solid rgb(255, 105, 180)' : 'none';
+        const border = isSelected ? '2px solid rgb(255, 52, 153)' : 'none';
+
         return (
           <div
             key={i}
-            ref={isPlaying ? activeNoteRef : null}
             onClick={() => onToggleNote && onToggleNote(i)}
             style={{
-              position: 'absolute',
-              left: `${left}px`,
-              top: `${top}px`,
               width: `${barWidth}px`,
               height: `${BASE_HEIGHT}px`,
               backgroundColor,
               border,
-              borderRadius: '4px',
-              cursor: 'pointer',
-              boxShadow: isPlaying ? '0 0 10px rgba(153, 51, 255, 0.8)' : 'none',
+              borderRadius: "4px",
+              cursor: "pointer",
+              flexShrink: 0,
+              boxShadow: isPlaying ? '0 0 40px rgb(210, 166, 255)' : 'none',
+              backgroundColor: isPlaying ? 'hsl(296, 100.00%, 78.00%)' : `hsl(${hue}, ${saturation}%, ${lightness}%)`,
               transition: 'background-color 0.3s, box-shadow 0.3s'
             }}
             title={`Pitch: ${pitch}, Dur: ${duration}, Vel: ${velocity}`}
@@ -839,8 +897,6 @@ const StickRoll = ({ notes = [], playingIndex, selectedIndices, onToggleNote }) 
   );
 };
 
-// Enhance MutationControls component
-
 const MutationControls = ({ genome, selectedIndices, onMutate }) => {
   const [mutationType, setMutationType] = useState('pitch');
   const [intensity, setIntensity] = useState(3);
@@ -848,13 +904,10 @@ const MutationControls = ({ genome, selectedIndices, onMutate }) => {
   const handleMutate = () => {
     if (!genome?.data) return;
     const originalData = Array.isArray(genome.data) ? genome.data : JSON.parse(genome.data);
-    
-    // If no notes are selected, alert the user
     if (selectedIndices.length === 0) {
       alert("Please select at least one note to mutate by clicking on it in the melody display.");
       return;
     }
-    
     const mutated = originalData.map((note, i) => {
       if (!selectedIndices.includes(i)) return { ...note };
       return applyMutation(note);
@@ -882,7 +935,7 @@ const MutationControls = ({ genome, selectedIndices, onMutate }) => {
       return {
         pitch: pitch + randomShift(intensity),
         duration: [0.25, 0.5, 1, 2][Math.floor(Math.random() * 4)],
-        velocity: clamp(velocity + randomShift(intensity), 0, 127),
+        velocity: clamp(velocity + randomShift(intensity), 0, 127)
       };
     }
   };
@@ -891,13 +944,16 @@ const MutationControls = ({ genome, selectedIndices, onMutate }) => {
   const randomShiftIndex = (max) => Math.floor(Math.random() * (max * 2 + 1)) - max;
   const clamp = (val, min, max) => Math.min(max, Math.max(min, val));
 
-  // Get the appropriate mutation icon based on type
   const getMutationIcon = () => {
-    switch(mutationType) {
-      case 'pitch': return '↕️';
-      case 'duration': return '↔️';
-      case 'velocity': return '📊';
-      default: return '🧬';
+    switch (mutationType) {
+      case 'pitch':
+        return '↕️';
+      case 'duration':
+        return '↔️';
+      case 'velocity':
+        return '📊';
+      default:
+        return '🧬';
     }
   };
 
@@ -910,13 +966,13 @@ const MutationControls = ({ genome, selectedIndices, onMutate }) => {
           <span className="label">notes selected</span>
         </div>
       </div>
-      
+
       <p className="mutation-instruction">
-        {selectedIndices.length > 0 ? 
-          `${selectedIndices.length} notes selected for mutation` : 
-          'Select notes by clicking the sticks above'}
+        {selectedIndices.length > 0
+          ? `${selectedIndices.length} notes selected for mutation`
+          : 'Select notes by clicking on the sticks above'}
       </p>
-      
+
       <div className="mutation-options">
         <div className="control-group">
           <label>Mutation Type:</label>
@@ -930,16 +986,16 @@ const MutationControls = ({ genome, selectedIndices, onMutate }) => {
             <div className="select-icon">{getMutationIcon()}</div>
           </div>
         </div>
-        
+
         <div className="control-group">
           <label>Intensity: {intensity}</label>
           <div className="slider-container">
-            <input 
-              type="range" 
-              min="1" 
-              max="10" 
-              value={intensity} 
-              onChange={(e) => setIntensity(parseInt(e.target.value))} 
+            <input
+              type="range"
+              min="1"
+              max="10"
+              value={intensity}
+              onChange={(e) => setIntensity(parseInt(e.target.value))}
             />
             <div className="slider-labels">
               <span>Subtle</span>
@@ -948,13 +1004,13 @@ const MutationControls = ({ genome, selectedIndices, onMutate }) => {
           </div>
         </div>
       </div>
-      
-      <button 
-        className={`action-btn mutate ${selectedIndices.length === 0 ? 'disabled' : ''}`} 
+
+      <button
+        className={`action-btn mutate ${selectedIndices.length === 0 ? 'disabled' : ''}`}
         onClick={handleMutate}
         disabled={selectedIndices.length === 0}
       >
-        <span>⟳</span> Apply Mutation to Selected Notes
+        <i className="fas fa-dna"></i> Apply Mutation to Selected Notes
       </button>
     </div>
   );
@@ -976,8 +1032,23 @@ const ScoreSlider = ({ onRate, initialValue = 50 }) => {
         <div className="score-value">{score}</div>
       </div>
       <div className="slider-with-input">
-        <input type="range" id="score-slider" min="1" max="100" value={score} onChange={handleScoreChange} className="score-slider" />
-        <input type="number" min="1" max="100" value={score} onChange={handleScoreChange} className="score-input" />
+        <input
+          type="range"
+          id="score-slider"
+          min="1"
+          max="100"
+          value={score}
+          onChange={handleScoreChange}
+          className="score-slider"
+        />
+        <input
+          type="number"
+          min="1"
+          max="100"
+          value={score}
+          onChange={handleScoreChange}
+          className="score-input"
+        />
       </div>
       <button className="submit-score-btn" onClick={handleSubmitScore}>
         Submit Rating

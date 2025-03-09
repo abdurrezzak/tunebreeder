@@ -11,6 +11,7 @@ from sqlalchemy import func, desc
 
 from . import models, schemas, auth, database, genomes
 from .database import engine
+from . import experiments
 
 # Load environment variables
 load_dotenv()
@@ -105,6 +106,8 @@ def get_current_genome(
     
     return genome_dict
 
+# Modify the existing mutate_genome endpoint
+
 @app.post("/api/genome/{genome_id}/mutate")
 def mutate_genome(
     genome_id: int,
@@ -130,6 +133,40 @@ def mutate_genome(
     # Update the genome with the new mutation
     genome.data = mutation.mutation_data
     genome.score = mutation.score
+    
+    # Update the user's contribution count
+    current_user.contribution_count += 1
+    
+    # Find which experiment this genome belongs to and check if we need to advance the generation
+    genome_exp = db.query(models.GenomeExperiment).filter(
+        models.GenomeExperiment.genome_id == genome_id
+    ).first()
+    
+    if genome_exp:
+        experiment = db.query(models.Experiment).filter(
+            models.Experiment.id == genome_exp.experiment_id
+        ).first()
+        
+        if experiment:
+            # Update best score if applicable
+            if mutation.score > experiment.best_score:
+                experiment.best_score = mutation.score
+            
+            # Check if all genomes in current generation have been scored
+            all_scored = db.query(
+                ~db.query(models.GenomeExperiment)
+                .join(models.Genome)
+                .filter(
+                    models.GenomeExperiment.experiment_id == experiment.id,
+                    models.GenomeExperiment.generation == experiment.current_generation,
+                    models.Genome.score == 0
+                ).exists()
+            ).scalar()
+
+            
+            # If all genomes are scored, automatically advance to next generation
+            if all_scored:
+                experiments.advance_experiment_generation(db, experiment.id)
     
     db.commit()
     db.refresh(db_mutation)
@@ -304,18 +341,146 @@ def get_latest_playlist(
                 "genome": {
                     "id": genome.id,
                     "generation": genome.generation,
+                    "data": json.loads(genome.data),
                     "score": genome.score
                 }
             })
     
     return result
 
+# Add these new endpoints
+
+@app.get("/api/experiments")
+def get_experiments(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_active_user),
+    skip: int = 0, 
+    limit: int = 100
+):
+    """Get all experiments"""
+    return experiments.get_all_experiments(db, skip, limit)
+
+@app.get("/api/experiments/{experiment_id}")
+def get_experiment(
+    experiment_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_active_user)
+):
+    """Get a specific experiment by ID"""
+    experiment = experiments.get_experiment(db, experiment_id)
+    if not experiment:
+        raise HTTPException(status_code=404, detail="Experiment not found")
+    return experiment
+
+@app.get("/api/experiments/{experiment_id}/generation/{generation}")
+def get_genome_from_experiment(
+    experiment_id: int,
+    generation: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_active_user)
+):
+    """Get a random genome from specified experiment and generation"""
+    # First check if the experiment exists
+    experiment = db.query(models.Experiment).filter(models.Experiment.id == experiment_id).first()
+    if not experiment:
+        raise HTTPException(status_code=404, detail="Experiment not found")
+    
+    # Check if generation is valid
+    if generation < 0 or generation > experiment.current_generation:
+        raise HTTPException(status_code=400, detail=f"Invalid generation. Current generation is {experiment.current_generation}")
+    
+    # Get a random genome
+    genome = experiments.get_random_genome_from_experiment(db, experiment_id, generation)
+    if not genome:
+        raise HTTPException(status_code=404, detail="No genomes available for this experiment and generation")
+    
+    # Convert genome data from JSON string to Python dict for response
+    genome_dict = {
+        "id": genome.id,
+        "generation": genome.generation,
+        "data": json.loads(genome.data),
+        "score": genome.score,
+        "experiment_id": experiment_id,
+        "experiment_name": experiment.name
+    }
+    
+    return genome_dict
+
+@app.get("/api/genome/random")
+def get_random_genome(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_active_user)
+):
+    """Get a random genome from any active experiment"""
+    genome = experiments.get_random_genome_from_any_experiment(db)
+    if not genome:
+        raise HTTPException(status_code=404, detail="No genomes available")
+    
+    # Get experiment info
+    genome_exp = db.query(models.GenomeExperiment).filter(
+        models.GenomeExperiment.genome_id == genome.id
+    ).first()
+    
+    if not genome_exp:
+        raise HTTPException(status_code=404, detail="Genome not associated with an experiment")
+    
+    experiment = db.query(models.Experiment).filter(
+        models.Experiment.id == genome_exp.experiment_id
+    ).first()
+    
+    # Convert genome data from JSON string to Python dict for response
+    genome_dict = {
+        "id": genome.id,
+        "generation": genome.generation,
+        "data": json.loads(genome.data),
+        "score": genome.score,
+        "experiment_id": experiment.id,
+        "experiment_name": experiment.name
+    }
+    
+    return genome_dict
+
+@app.post("/api/admin/experiments/advance/{experiment_id}")
+def advance_experiment(
+    experiment_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_active_user)
+):
+    """Advance an experiment to the next generation"""
+    result = experiments.advance_experiment_generation(db, experiment_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Experiment not found")
+    return result
+
+@app.post("/api/admin/experiments/create")
+def create_experiment(
+    experiment: schemas.ExperimentCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_active_user)
+):
+    """Create a new experiment"""
+    new_exp, _ = experiments.create_experiment(
+        db, 
+        experiment.name, 
+        experiment.description, 
+        experiment.max_generations
+    )
+    
+    return {
+        "id": new_exp.id,
+        "name": new_exp.name,
+        "message": f"Created experiment with {genomes.INITIAL_GENOME_COUNT} initial genomes"
+    }
+
 # Initialize database with genomes if empty
 @app.on_event("startup")
 def startup_event():
     db = database.SessionLocal()
     try:
-        # Check if we have any genomes
+        # Initialize experiments if none exist
+        experiments.initialize_default_experiments(db)
+        
+        # Check if we have any genomes (keep existing code)
         if db.query(models.Genome).count() == 0:
             genomes.initialize_genomes(db)
     finally:
