@@ -26,7 +26,8 @@ class Genome(Base):
     id = Column(Integer, primary_key=True, index=True)
     generation = Column(Integer)
     data = Column(Text)  # JSON string representation of the genome
-    score = Column(Float, default=0.0)
+    score = Column(Float, default=50.0)
+    user_scored = Column(Boolean, default=False)  # True if user scored, False if heuristic
     parent1_id = Column(Integer, ForeignKey("genomes.id"), nullable=True)
     parent2_id = Column(Integer, ForeignKey("genomes.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -34,6 +35,7 @@ class Genome(Base):
     # Relationships
     mutations = relationship("Mutation", back_populates="genome")
     saved_by = relationship("SavedMelody", back_populates="genome")
+
 
 class Mutation(Base):
     __tablename__ = "mutations"

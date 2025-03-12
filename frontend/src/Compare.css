@@ -1,0 +1,400 @@
+.compare-page {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  
+  .compare-content {
+    flex: 1;
+    padding: 2rem;
+    max-width: 1600px;
+    margin: 0 auto;
+    width: 100%;
+  }
+  
+  .input-section {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: var(--card-background);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    align-items: flex-end;
+  }
+  
+  .input-group {
+    flex: 1;
+    min-width: 200px;
+  }
+  
+  .input-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+  }
+  
+  .input-group input {
+    width: 100%;
+    padding: 0.8rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--input-background);
+    color: var(--text);
+    font-size: 1rem;
+    transition: border-color 0.2s;
+  }
+  
+  .input-group input:focus {
+    border-color: var(--primary);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(108, 99, 255, 0.2);
+  }
+  
+  .compare-btn {
+    padding: 0.8rem 1.5rem;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .compare-btn:hover:not(:disabled) {
+    background: var(--primary-dark);
+  }
+  
+  .compare-btn:disabled {
+    background: var(--primary-light);
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+  
+  .spinner-small {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spinner 0.8s linear infinite;
+  }
+  
+  @keyframes spinner {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  
+  .error-message {
+    padding: 1rem 1.5rem;
+    background: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+    border-left: 4px solid #dc3545;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .comparison-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  
+  .play-controls {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1rem;
+  }
+  
+  .play-both-btn {
+    padding: 0.8rem 2rem;
+    font-size: 1.1rem;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    transition: all 0.2s;
+  }
+  
+  .play-both-btn:hover:not(:disabled) {
+    background: var(--primary-dark);
+    transform: translateY(-1px);
+  }
+  
+  .play-both-btn.playing {
+    background: #dc3545;
+  }
+  
+  .play-both-btn.playing:hover {
+    background: #b52b37;
+  }
+  
+  .play-both-btn:disabled {
+    background: var(--primary-light);
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+  
+  .melodies-comparison {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+  
+  .melody-column {
+    background: var(--card-background);
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+  
+  .melody-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  
+  .melody-heading h3 {
+    margin: 0;
+    font-size: 1.2rem;
+  }
+  
+  .melody-info {
+    display: flex;
+    gap: 1rem;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+  
+  .stickroll-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    max-height: 250px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 10px;
+    background: rgba(250, 245, 255, 0.05);
+    border-radius: 8px;
+  }
+  
+  .stick {
+    border-radius: 4px;
+    flex-shrink: 0;
+    transition: transform 0.1s, opacity 0.1s;
+  }
+  
+  .stick.playing {
+    transform: translateY(-2px);
+    opacity: 0.9;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+  
+  /* Responsive design */
+  @media (min-width: 992px) {
+    .melodies-comparison {
+      flex-direction: row;
+    }
+    
+    .melody-column {
+      flex: 1;
+    }
+  }
+  
+  /* Dark mode specifics */
+  .dark-mode .stickroll-container {
+    background: rgba(30, 30, 40, 0.3);
+  }
+  
+  .dark-mode .stick.playing {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+  
+  /* Add to existing MyTunes.css - styles for genome IDs */
+  .node-id {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+  
+  .node-id i {
+    font-size: 0.7rem;
+    opacity: 0.8;
+  }
+
+/* Add these styles for the melody selector */
+
+.input-with-button {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.input-with-button input {
+  flex: 1;
+}
+
+.browse-btn {
+  background-color: var(--secondary-background);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0 0.8rem;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.browse-btn:hover {
+  background-color: var(--hover-background);
+  border-color: var(--primary-light);
+}
+
+.melody-selector-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.melody-selector-modal {
+  background-color: var(--card-background);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.selector-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.selector-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+
+.close-btn:hover {
+  color: var(--text);
+}
+
+.melodies-list {
+  padding: 1rem;
+  overflow-y: auto;
+  max-height: 60vh;
+}
+
+.selector-melody-item {
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  margin-bottom: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.selector-melody-item:hover {
+  border-color: var(--primary);
+  background-color: var(--hover-background);
+  transform: translateY(-1px);
+}
+
+.selector-melody-info h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.1rem;
+}
+
+.selector-melody-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.no-melodies-message {
+  padding: 2rem;
+  text-align: center;
+}
+
+.no-melodies-message p {
+  margin-bottom: 1.5rem;
+  color: var(--text-secondary);
+}
+
+.primary-btn {
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 0.8rem 1.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.primary-btn:hover {
+  background-color: var(--primary-dark);
+}
+
+/* Make error messages more noticeable */
+.error-message {
+  padding: 1rem 1.5rem;
+  background: rgba(220, 53, 69, 0.1);
+  color: #dc3545;
+  border-left: 4px solid #dc3545;
+  border-radius: 6px;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  font-weight: 500;
+}
+
+.error-hint {
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+  opacity: 0.8;
+}

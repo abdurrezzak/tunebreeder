@@ -1701,7 +1701,7 @@
   .experiment-final {
     margin-top: auto;
     padding-top: 1rem;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var (--border);
   }
   
   .experiment-final p {
@@ -1811,4 +1811,173 @@
   .genome-controls {
     margin-top: 20px;
   }
+
+  /* Countdown Modal */
+  .countdown-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    backdrop-filter: blur(3px);
+  }
   
+  .countdown-modal {
+    background: var(--light);
+    border-radius: 12px;
+    padding: 2rem;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    text-align: center;
+    animation: modal-appear 0.3s ease-out;
+  }
+  
+  .dark-mode .countdown-modal {
+    background: var(--dark);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  }
+  
+  .countdown-modal h3 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    color: var(--primary);
+  }
+  
+  .next-generation-info {
+    margin: 1.5rem 0;
+    padding: 1.5rem;
+    background: rgba(108, 99, 255, 0.1);
+    border-radius: 8px;
+  }
+  
+  .next-generation-info h4 {
+    font-size: 1.1rem;
+    margin-bottom: 0.8rem;
+    color: var(--text);
+  }
+  
+  .countdown-timer {
+    font-size: 3rem;
+    font-weight: bold;
+    color: var(--primary);
+    margin: 1rem 0;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 2px;
+  }
+  
+  .countdown-info {
+    font-size: 0.9rem;
+    color: var(--text-light);
+    line-height: 1.5;
+  }
+  
+  .countdown-actions {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  
+  .action-btn.secondary {
+    background: transparent;
+    border: 2px solid var(--primary);
+    color: var(--primary);
+  }
+  
+  .action-btn.secondary:hover {
+    background: rgba(108, 99, 255, 0.1);
+  }
+  
+  @keyframes modal-appear {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .countdown-display {
+    padding: 2rem;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.7);
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    margin: 1.5rem 0;
+  }
+  
+  .dark-mode .countdown-display {
+    background: rgba(40, 40, 50, 0.8);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  }
+  
+  .countdown-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+  
+  .countdown-content h3 {
+    color: var(--accent-color);
+    margin-bottom: 0.5rem;
+  }
+  
+  .countdown-timer {
+    font-size: 2.5rem;
+    font-weight: bold;
+    background: linear-gradient(45deg, var(--accent-color), var(--primary-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin: 1rem 0;
+    text-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .countdown-message {
+    font-size: 1rem;
+    color: var(--text-color-muted);
+    max-width: 80%;
+    line-height: 1.5;
+    margin: 1rem 0;
+  }
+  
+  .countdown-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    justify-content: center;
+  }
+
+
+  /* Header navigation styles */
+  .header-nav {
+    display: flex;
+    gap: 1rem;
+  }
+
+  .nav-btn {
+    background: transparent;
+    border: none;
+    color: var(--text);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s;
+  }
+
+  .nav-btn:hover {
+    background: rgba(108, 99, 255, 0.1);
+    color: var(--primary);
+  }
+

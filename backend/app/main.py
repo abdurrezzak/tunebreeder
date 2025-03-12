@@ -8,6 +8,8 @@ import os
 from dotenv import load_dotenv
 # Add these imports at the top
 from sqlalchemy import func, desc
+from datetime import datetime, timedelta
+import pytz
 
 from . import models, schemas, auth, database, genomes
 from .database import engine
@@ -108,6 +110,9 @@ def get_current_genome(
 
 # Modify the existing mutate_genome endpoint
 
+# Store the next scheduled update time
+next_scheduled_update = datetime.now(pytz.utc) + timedelta(minutes=1)
+
 @app.post("/api/genome/{genome_id}/mutate")
 def mutate_genome(
     genome_id: int,
@@ -120,6 +125,36 @@ def mutate_genome(
     genome = db.query(models.Genome).filter(models.Genome.id == genome_id).first()
     if not genome:
         raise HTTPException(status_code=404, detail="Genome not found")
+    
+    # Find which experiment and generation this genome belongs to
+    genome_exp = db.query(models.GenomeExperiment).filter(
+        models.GenomeExperiment.genome_id == genome_id
+    ).first()
+    
+    if not genome_exp:
+        raise HTTPException(status_code=404, detail="Genome not associated with any experiment")
+        
+    # Check if user has already contributed to this experiment's generation
+    existing_contribution = db.query(models.Mutation).join(
+        models.GenomeExperiment, 
+        models.Mutation.genome_id == models.GenomeExperiment.genome_id
+    ).filter(
+        models.Mutation.user_id == current_user.id,
+        models.GenomeExperiment.experiment_id == genome_exp.experiment_id,
+        models.GenomeExperiment.generation == genome_exp.generation
+    ).first()
+    
+    if existing_contribution:
+        # Return a specific error code and response for already contributed
+        raise HTTPException(
+            status_code=409, 
+            detail={
+                "message": "You have already contributed to this experiment's generation",
+                "next_update": next_scheduled_update.isoformat(),
+                "experiment_id": genome_exp.experiment_id,
+                "generation": genome_exp.generation
+            }
+        )
     
     # Create the mutation record
     db_mutation = models.Mutation(
@@ -171,7 +206,12 @@ def mutate_genome(
     db.commit()
     db.refresh(db_mutation)
     
-    return {"message": "Mutation submitted successfully", "mutation_id": db_mutation.id}
+    # Return the next scheduled update time along with the success message
+    return {
+        "message": "Mutation submitted successfully", 
+        "mutation_id": db_mutation.id,
+        "next_update": next_scheduled_update.isoformat()
+    }
 
 @app.post("/api/melody/save")
 def save_melody(
@@ -412,8 +452,11 @@ def get_random_genome(
     current_user: models.User = Depends(auth.get_current_active_user)
 ):
     """Get a random genome from any active experiment"""
+    print(f"User {current_user.id} ({current_user.username}) requesting random genome")
+    
     genome = experiments.get_random_genome_from_any_experiment(db)
     if not genome:
+        print("No genomes available from any experiment")
         raise HTTPException(status_code=404, detail="No genomes available")
     
     # Get experiment info
@@ -422,6 +465,7 @@ def get_random_genome(
     ).first()
     
     if not genome_exp:
+        print(f"Genome {genome.id} not associated with any experiment")
         raise HTTPException(status_code=404, detail="Genome not associated with an experiment")
     
     experiment = db.query(models.Experiment).filter(
@@ -429,48 +473,128 @@ def get_random_genome(
     ).first()
     
     # Convert genome data from JSON string to Python dict for response
-    genome_dict = {
-        "id": genome.id,
-        "generation": genome.generation,
-        "data": json.loads(genome.data),
-        "score": genome.score,
-        "experiment_id": experiment.id,
-        "experiment_name": experiment.name
-    }
-    
-    return genome_dict
+    try:
+        genome_data = json.loads(genome.data)
+        
+        genome_dict = {
+            "id": genome.id,
+            "generation": genome.generation,
+            "data": genome_data,
+            "score": genome.score,
+            "experiment_id": experiment.id,
+            "experiment_name": experiment.name
+        }
+        
+        print(f"Successfully returning genome {genome.id} from experiment {experiment.name}")
+        return genome_dict
+    except json.JSONDecodeError as e:
+        print(f"Error decoding genome data: {e}")
+        raise HTTPException(status_code=500, detail=f"Invalid genome data format: {str(e)}")
 
-@app.post("/api/admin/experiments/advance/{experiment_id}")
-def advance_experiment(
-    experiment_id: int,
+
+
+@app.get("/api/genome/{genome_id}/ancestry")
+def get_genome_ancestry(
+    genome_id: int,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_active_user)
 ):
-    """Advance an experiment to the next generation"""
-    result = experiments.advance_experiment_generation(db, experiment_id)
-    if not result:
-        raise HTTPException(status_code=404, detail="Experiment not found")
-    return result
-
-@app.post("/api/admin/experiments/create")
-def create_experiment(
-    experiment: schemas.ExperimentCreate,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_active_user)
-):
-    """Create a new experiment"""
-    new_exp, _ = experiments.create_experiment(
-        db, 
-        experiment.name, 
-        experiment.description, 
-        experiment.max_generations
-    )
+    """Get a focused ancestry tree for a genome (highest scoring branch only)"""
+    # First check if the genome exists
+    genome = db.query(models.Genome).filter(models.Genome.id == genome_id).first()
+    if not genome:
+        raise HTTPException(status_code=404, detail="Genome not found")
     
-    return {
-        "id": new_exp.id,
-        "name": new_exp.name,
-        "message": f"Created experiment with {genomes.INITIAL_GENOME_COUNT} initial genomes"
+    # Initialize the response structure
+    ancestry = {
+        "nodes": [],
+        "edges": []
     }
+    
+    # Add the requested genome to nodes
+    try:
+        ancestry["nodes"].append({
+            "id": genome.id,
+            "generation": genome.generation,
+            "score": genome.score,
+            "data": json.loads(genome.data)
+        })
+    except json.JSONDecodeError:
+        print(f"Error decoding genome data for genome {genome.id}")
+        raise HTTPException(status_code=500, detail="Error decoding genome data")
+    
+    # Track processed genomes to avoid duplicates
+    processed_genomes = set([genome.id])
+    
+    # Function to recursively add ancestors of the highest scoring parent
+    def add_highest_scoring_ancestor(current_genome, max_depth=3, current_depth=0):
+        if current_depth >= max_depth:
+            return
+        
+        # Check if this genome has parents
+        if not current_genome.parent1_id and not current_genome.parent2_id:
+            return
+        
+        # Get both parents if they exist
+        parent1 = None
+        parent2 = None
+        
+        if current_genome.parent1_id:
+            parent1 = db.query(models.Genome).filter(models.Genome.id == current_genome.parent1_id).first()
+        
+        if current_genome.parent2_id:
+            parent2 = db.query(models.Genome).filter(models.Genome.id == current_genome.parent2_id).first()
+        
+        # Determine which parent has higher score
+        higher_parent = None
+        other_parent = None
+        
+        if parent1 and parent2:
+            if parent1.score >= parent2.score:  # Parent1 is higher or equal
+                higher_parent = parent1
+                other_parent = parent2
+            else:  # Parent2 is higher
+                higher_parent = parent2
+                other_parent = parent1
+        elif parent1:
+            higher_parent = parent1
+        elif parent2:
+            higher_parent = parent2
+        
+        # Add both parents to the tree
+        for parent in [higher_parent, other_parent]:
+            if not parent:
+                continue
+                
+            if parent.id not in processed_genomes:
+                processed_genomes.add(parent.id)
+                try:
+                    ancestry["nodes"].append({
+                        "id": parent.id,
+                        "generation": parent.generation,
+                        "score": parent.score,
+                        "data": json.loads(parent.data),
+                        "is_main_branch": parent == higher_parent  # Flag the main branch
+                    })
+                    ancestry["edges"].append({
+                        "from_id": parent.id,
+                        "to_id": current_genome.id,
+                        "from_generation": parent.generation,
+                        "to_generation": current_genome.generation,
+                        "score": parent.score,
+                        "is_main_branch": parent == higher_parent
+                    })
+                except json.JSONDecodeError:
+                    print(f"Error decoding data for parent genome {parent.id}")
+        
+        # Only continue recursion with the higher scoring parent
+        if higher_parent:
+            add_highest_scoring_ancestor(higher_parent, max_depth, current_depth + 1)
+    
+    # Start adding ancestors from the requested genome
+    add_highest_scoring_ancestor(genome)
+    
+    return ancestry
 
 # Initialize database with genomes if empty
 @app.on_event("startup")
@@ -480,8 +604,126 @@ def startup_event():
         # Initialize experiments if none exist
         experiments.initialize_default_experiments(db)
         
+        # Diagnose and repair existing experiments
+        experiments.diagnose_and_repair_experiments(db)
+        
         # Check if we have any genomes (keep existing code)
         if db.query(models.Genome).count() == 0:
             genomes.initialize_genomes(db)
     finally:
         db.close()
+
+
+# Add this new endpoint after the existing genome endpoints
+
+@app.get("/api/genome/{genome_id}")
+def get_genome_by_id(
+    genome_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_active_user)
+):
+    """Get a specific genome by ID"""
+    # First check if the genome exists
+    genome = db.query(models.Genome).filter(models.Genome.id == genome_id).first()
+    if not genome:
+        raise HTTPException(status_code=404, detail=f"Genome with ID {genome_id} not found")
+    
+    # Convert genome data from JSON string to Python dict for response
+    try:
+        genome_data = json.loads(genome.data)
+        
+        genome_dict = {
+            "id": genome.id,
+            "generation": genome.generation,
+            "data": genome_data,
+            "score": genome.score,
+            "parent1_id": genome.parent1_id,
+            "parent2_id": genome.parent2_id,
+        }
+        
+        # Get experiment info if available
+        genome_exp = db.query(models.GenomeExperiment).filter(
+            models.GenomeExperiment.genome_id == genome.id
+        ).first()
+        
+        if genome_exp:
+            experiment = db.query(models.Experiment).filter(
+                models.Experiment.id == genome_exp.experiment_id
+            ).first()
+            if experiment:
+                genome_dict["experiment_id"] = experiment.id
+                genome_dict["experiment_name"] = experiment.name
+        
+        return genome_dict
+    except json.JSONDecodeError as e:
+        print(f"Error decoding genome data for genome {genome_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Invalid genome data format for genome {genome_id}: {str(e)}")
+
+
+
+
+from apscheduler.schedulers.background import BackgroundScheduler
+import traceback
+# Add these imports at the top
+from datetime import datetime, timedelta
+import pytz
+
+def periodic_generation_update():
+    global next_scheduled_update
+    
+    print(f"Running periodic generation update at {datetime.now(pytz.utc)}")
+
+    # Obtain a session from the dependency generator
+    db = next(get_db())
+    try:
+        experiments_list = db.query(models.Experiment).filter(models.Experiment.completed == False).all()
+        print(f"Found {len(experiments_list)} active experiments")
+        
+        for exp in experiments_list:
+            print(f"Processing experiment {exp.id} (generation {exp.current_generation})")
+            
+            # IMPORTANT: Use the experiment-specific function to advance the generation
+            # This ensures proper isolation between experiments
+            result = experiments.advance_experiment_generation(db, exp.id)
+            print(f"Result for experiment {exp.id}: {result}")
+            
+    except Exception as e:
+        print("Error in periodic_generation_update:", e)
+        traceback.print_exc()
+    finally:
+        db.close()
+
+# Set up the scheduler to run every 2 minutes
+scheduler = BackgroundScheduler()
+scheduler.add_job(periodic_generation_update, 'interval', minutes=1)
+scheduler.start()
+
+@app.on_event("shutdown")
+def shutdown_event():
+    scheduler.shutdown()
+
+@app.get("/api/experiments/{experiment_id}/generation/{generation}/contribution")
+def check_user_contribution(
+    experiment_id: int,
+    generation: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_active_user)
+):
+    """Check if the current user has already contributed to this experiment's generation"""
+    # Check for existing contribution
+    existing_contribution = db.query(models.Mutation).join(
+        models.GenomeExperiment, 
+        models.Mutation.genome_id == models.GenomeExperiment.genome_id
+    ).filter(
+        models.Mutation.user_id == current_user.id,
+        models.GenomeExperiment.experiment_id == experiment_id,
+        models.GenomeExperiment.generation == generation
+    ).first()
+    
+    if existing_contribution:
+        return {
+            "has_contributed": True,
+            "next_update": next_scheduled_update.isoformat()
+        }
+    
+    return {"has_contributed": False}

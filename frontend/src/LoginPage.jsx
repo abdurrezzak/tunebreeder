@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import { ThemeContext } from './context/ThemeContext';
 import './LoginPage.css';
 
 const LoginPage = () => {
-  const [darkMode, setDarkMode] = useState(false);
+  const { darkMode, toggleDarkMode } = useContext(ThemeContext);
   const [activeForm, setActiveForm] = useState('login'); // 'login', 'signup', or 'forgot'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -11,11 +12,6 @@ const LoginPage = () => {
   const [loginData, setLoginData] = useState({ email: '', password: '', remember: false });
   const [signupData, setSignupData] = useState({ fullname: '', email: '', password: '', confirmPassword: '' });
   const [forgotData, setForgotData] = useState({ email: '' });
-  
-  // Toggle dark mode
-  const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
-  };
   
   // Apply dark mode class to body
   useEffect(() => {
@@ -434,21 +430,11 @@ const LoginPage = () => {
       <div className={`container ${darkMode ? 'dark-mode' : ''}`}>
         <div className="content-box">
           <div className="login-form">
-            <div className="mode-toggle">
-              <button onClick={toggleDarkMode} className="toggle-btn">
-                {darkMode ? '☀️' : '🌙'}
+            <div className="login-header">
+              <h1>TuneBreeder</h1>
+              <button className="theme-toggle" onClick={toggleDarkMode}>
+                {darkMode ? <i className="fas fa-sun"></i> : <i className="fas fa-moon"></i>}
               </button>
-            </div>
-            
-            <div className="logo">
-              <div className="logo-icon">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M9 19V5L21 3V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <circle cx="6" cy="19" r="3" stroke="currentColor" strokeWidth="2"/>
-                  <circle cx="18" cy="17" r="3" stroke="currentColor" strokeWidth="2"/>
-                </svg>
-              </div>
-              <div className="logo-text">TuneBreeder</div>
             </div>
             
             {renderForm()}

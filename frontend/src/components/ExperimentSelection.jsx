@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import '../HomePage.css';
 
-const ExperimentSelection = ({ onSelectGenome }) => {
+const ExperimentSelection = ({ onSelectGenome, onSelectGenomeWithContribution }) => {
   const [experiments, setExperiments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -54,16 +54,53 @@ const ExperimentSelection = ({ onSelectGenome }) => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8000/api/experiments/${experimentId}/generation/${generation}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
       
-      if (!response.ok) throw new Error('Failed to fetch genome from experiment');
+      // First check if user has already contributed to this experiment's generation
+      const contributionCheck = await fetch(
+        `http://localhost:8000/api/experiments/${experimentId}/generation/${generation}/contribution`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       
-      const genomeData = await response.json();
-      onSelectGenome(genomeData);
+      const contributionStatus = await contributionCheck.json();
+      
+      if (contributionStatus.has_contributed) {
+        // User has already contributed - get the genome anyway but set the countdown state
+        const response = await fetch(`http://localhost:8000/api/experiments/${experimentId}/generation/${generation}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        
+        if (!response.ok) throw new Error('Failed to fetch genome from experiment');
+        
+        const genomeData = await response.json();
+        
+        // Ensure we're storing the contribution record in localStorage
+        const contributionKey = `${experimentId}_${generation}`;
+        const storedContributions = JSON.parse(localStorage.getItem('userContributions') || '{}');
+        storedContributions[contributionKey] = true;
+        localStorage.setItem('userContributions', JSON.stringify(storedContributions));
+        
+        // Set next update time in the parent component
+        if (contributionStatus.next_update) {
+          const nextUpdateTime = new Date(contributionStatus.next_update);
+          onSelectGenomeWithContribution(genomeData, true, nextUpdateTime);
+        } else {
+          onSelectGenomeWithContribution(genomeData, true);
+        }
+      } else {
+        // User hasn't contributed yet - proceed normally
+        const response = await fetch(`http://localhost:8000/api/experiments/${experimentId}/generation/${generation}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        
+        if (!response.ok) throw new Error('Failed to fetch genome from experiment');
+        
+        const genomeData = await response.json();
+        onSelectGenomeWithContribution(genomeData, false);
+      }
     } catch (err) {
-      console.error('Error fetching genome from experiment:', err);
+      console.error('Error selecting experiment:', err);
       setError(err.message);
     } finally {
       setLoading(false);
