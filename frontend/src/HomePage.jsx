@@ -485,34 +485,72 @@ const HomePage = () => {
     }
   };
 
-  const mutateGenome = async () => {
-    if (!currentGenome || !userRating || !scoreSubmitted) {
-      alert('Please rate the melody before mutating');
-      return;
+  // Update the mutateGenome function to use conservative mutations
+
+const mutateGenome = async () => {
+  if (!currentGenome || !userRating || !scoreSubmitted) {
+    alert('Please rate the melody before mutating');
+    return;
+  }
+  try {
+    setIsMutating(true);
+    const genomeArray = genomeToNotes(currentGenome.data);
+    
+    // Apply conservative mutations to only a few random notes
+    const mutatedGenome = [...genomeArray]; // Create a copy
+    
+    // Select a small number of notes to mutate (2-5)
+    const numNotesToMutate = Math.floor(Math.random() * 4) + 2; // 2 to 5 notes
+    const notesToMutate = [];
+    
+    while (notesToMutate.length < numNotesToMutate) {
+      const idx = Math.floor(Math.random() * genomeArray.length);
+      if (!notesToMutate.includes(idx)) {
+        notesToMutate.push(idx);
+      }
     }
-    try {
-      setIsMutating(true);
-      const genomeArray = genomeToNotes(currentGenome.data);
-      const mutatedGenome = genomeArray.map((gene) => {
-        const pitch = gene.pitch || Math.round(gene.frequency || 60);
-        const duration = gene.duration || 0.5;
-        const velocity = gene.velocity || 80;
-        return {
-          pitch: pitch + (Math.floor(Math.random() * 7) - 3),
-          duration: [0.25, 0.5, 1, 2].includes(duration) ? duration : 0.5,
-          velocity: Math.min(100, Math.max(60, velocity + (Math.floor(Math.random() * 11) - 5))),
-        };
-      });
-      await submitMutation(mutatedGenome, userRating);
-      setUserRating(null);
-      setScoreSubmitted(false);
-    } catch (err) {
-      console.error('Error mutating genome:', err);
-      alert(`Mutation failed: ${err.message}`);
-    } finally {
-      setIsMutating(false);
-    }
-  };
+    
+    // Apply small changes to those notes
+    notesToMutate.forEach(idx => {
+      const gene = genomeArray[idx];
+      const pitch = gene.pitch || Math.round(gene.frequency || 60);
+      const velocity = gene.velocity || 80;
+      
+      // Small pitch change (-2 to +2 semitones)
+      const pitchChange = Math.floor(Math.random() * 5) - 2;
+      
+      // Small velocity change (-5 to +5)
+      const velocityChange = Math.floor(Math.random() * 11) - 5;
+      
+      // Duration might sometimes change but keep the same most of the time
+      const duration = gene.duration || 0.5;
+      const durations = [0.25, 0.5, 1, 2];
+      const currentDurationIdx = durations.indexOf(duration);
+      let newDurationIdx = currentDurationIdx;
+      
+      // Only 20% chance to change duration
+      if (Math.random() < 0.2 && currentDurationIdx >= 0) {
+        newDurationIdx = Math.max(0, Math.min(durations.length - 1, 
+          currentDurationIdx + (Math.random() < 0.5 ? 1 : -1)));
+      }
+      
+      mutatedGenome[idx] = {
+        pitch: Math.max(36, Math.min(84, pitch + pitchChange)),
+        duration: durations[newDurationIdx],
+        velocity: Math.max(60, Math.min(100, velocity + velocityChange))
+      };
+    });
+    
+    await submitMutation(mutatedGenome, userRating);
+    setUserRating(null);
+    setScoreSubmitted(false);
+  } catch (err) {
+    console.error('Error mutating genome:', err);
+    alert(`Mutation failed: ${err.message}`);
+  } finally {
+    setIsMutating(false);
+  }
+};
 
   const saveMelody = async () => {
     if (!currentGenome) return;
@@ -547,13 +585,16 @@ const HomePage = () => {
     setScoreSubmitted(true);
   };
 
+  // Update handleToggleNote to allow only one selection at a time
+
   const handleToggleNote = (index) => {
     setSelectedIndices((prev) => {
+      // If clicking on an already selected note, deselect it
       if (prev.includes(index)) {
-        return prev.filter((i) => i !== index);
-      } else {
-        return [...prev, index];
+        return [];
       }
+      // Otherwise, select just this note (replacing any previous selection)
+      return [index];
     });
   };
 
@@ -742,126 +783,161 @@ const HomePage = () => {
     );
   };
 
-  const MutationControls = ({ genome, selectedIndices, onMutate }) => {
-    const [mutationType, setMutationType] = useState('pitch');
-    const [intensity, setIntensity] = useState(3);
+// Update the MutationControls component
+// Simplify the MutationControls component
+
+const MutationControls = ({ genome, selectedIndices, onMutate }) => {
+  const [mutationType, setMutationType] = useState('pitch');
+  const [intensity, setIntensity] = useState(2);  // Default to lower intensity for more controlled mutations
   
-    const handleMutate = () => {
-      if (!genome?.data) return;
-      const originalData = Array.isArray(genome.data)
-        ? genome.data
-        : JSON.parse(genome.data);
-      if (selectedIndices.length === 0) {
-        alert("Please select at least one note to mutate by clicking on it in the melody display.");
-        return;
-      }
-      const mutated = originalData.map((note, i) => {
-        if (!selectedIndices.includes(i)) return { ...note };
-        return applyMutation(note);
-      });
-      onMutate(mutated);
-    };
+  // Remove mutation mode state and just use selectedIndices
   
-    const applyMutation = (note) => {
-      const pitch = note.pitch || Math.round(note.frequency || 60);
-      const duration = note.duration || 0.5;
-      const velocity = note.velocity || 80;
-      if (mutationType === 'pitch') {
-        return { ...note, pitch: pitch + randomShift(intensity) };
-      } else if (mutationType === 'duration') {
-        const durationOptions = [0.25, 0.5, 1, 2];
-        const idx = durationOptions.indexOf(duration);
-        let newIdx = idx + randomShiftIndex(intensity);
-        if (newIdx < 0) newIdx = 0;
-        if (newIdx >= durationOptions.length) newIdx = durationOptions.length - 1;
-        return { ...note, duration: durationOptions[newIdx] };
-      } else if (mutationType === 'velocity') {
-        const newVel = clamp(velocity + randomShift(intensity), 0, 127);
-        return { ...note, velocity: newVel };
-      } else {
-        return {
-          pitch: pitch + randomShift(intensity),
-          duration: [0.25, 0.5, 1, 2][Math.floor(Math.random() * 4)],
-          velocity: clamp(velocity + randomShift(intensity), 0, 127)
-        };
-      }
-    };
-  
-    const randomShift = (max) => Math.floor(Math.random() * (max * 2 + 1)) - max;
-    const randomShiftIndex = (max) => Math.floor(Math.random() * (max * 2 + 1)) - max;
-    const clamp = (val, min, max) => Math.min(max, Math.max(min, val));
-  
-    const getMutationIcon = () => {
-      switch (mutationType) {
-        case 'pitch':
-          return '↕️';
-        case 'duration':
-          return '↔️';
-        case 'velocity':
-          return '📊';
-        default:
-          return '🧬';
-      }
-    };
-  
-    return (
-      <div className="mutation-controls">
-        <div className="mutation-header">
-          <h4>Advanced Mutation Controls</h4>
-          <div className="selected-count">
-            <span className="count">{selectedIndices.length}</span>
-            <span className="label">notes selected</span>
-          </div>
-        </div>
-  
-        <p className="mutation-instruction">
-          {selectedIndices.length > 0
-            ? `${selectedIndices.length} notes selected for mutation`
-            : 'Select notes by clicking on the sticks above'}
-        </p>
-  
-        <div className="mutation-options">
-          <div className="control-group">
-            <label>Mutation Type:</label>
-            <div className="custom-select">
-              <select value={mutationType} onChange={(e) => setMutationType(e.target.value)}>
-                <option value="pitch">Pitch</option>
-                <option value="duration">Duration</option>
-                <option value="velocity">Volume</option>
-                <option value="all">All Properties</option>
-              </select>
-              <div className="select-icon">{getMutationIcon()}</div>
-            </div>
-          </div>
-  
-          <div className="control-group">
-            <label>Intensity: {intensity}</label>
-            <div className="slider-container">
-              <input
-                type="range"
-                min="1"
-                max="10"
-                value={intensity}
-                onChange={(e) => setIntensity(parseInt(e.target.value))}
-              />
-              <div className="slider-labels">
-                <span>Subtle</span>
-                <span>Extreme</span>
-              </div>
-            </div>
-          </div>
-        </div>
-  
-        <button
-          className={`action-btn mutate ${selectedIndices.length === 0 ? 'disabled' : ''}`}
-          onClick={handleMutate}
-          disabled={selectedIndices.length === 0}
-        >
-          <i className="fas fa-dna"></i> Apply Mutation to Selected Notes
-        </button>
-      </div>
-    );
+  const handleMutate = () => {
+    if (!genome?.data) return;
+    const originalData = Array.isArray(genome.data)
+      ? genome.data
+      : JSON.parse(genome.data);
+    
+    if (selectedIndices.length === 0) {
+      alert("Please select a note to mutate by clicking on it in the melody display.");
+      return;
+    }
+    
+    if (selectedIndices.length > 1) {
+      alert("Please select only one note at a time. Click notes to deselect them.");
+      return;
+    }
+    
+    // We know there's exactly one selected note
+    const indexToMutate = selectedIndices[0];
+    
+    const mutated = originalData.map((note, i) => {
+      if (i !== indexToMutate) return { ...note };
+      return applyMutation(note);
+    });
+    
+    onMutate(mutated);
   };
+
+  const applyMutation = (note) => {
+    const pitch = note.pitch || Math.round(note.frequency || 60);
+    const duration = note.duration || 0.5;
+    const velocity = note.velocity || 80;
+    
+    if (mutationType === 'pitch') {
+      // More precise pitch control for fine-grained evolution
+      const pitchShift = intensity <= 2 ? randomShift(1) : randomShift(intensity); 
+      return { ...note, pitch: pitch + pitchShift };
+    } else if (mutationType === 'duration') {
+      const durationOptions = [0.25, 0.5, 1, 2];
+      const idx = durationOptions.indexOf(duration);
+      // For very low intensity, only change by at most 1 duration step
+      let newIdx = intensity <= 2 ? idx + (Math.random() < 0.5 ? 1 : -1) : idx + randomShiftIndex(intensity);
+      if (newIdx < 0) newIdx = 0;
+      if (newIdx >= durationOptions.length) newIdx = durationOptions.length - 1;
+      return { ...note, duration: durationOptions[newIdx] };
+    } else if (mutationType === 'velocity') {
+      // More precise velocity control
+      const velocityShift = intensity <= 2 ? randomShift(5) : randomShift(intensity * 5);
+      const newVel = clamp(velocity + velocityShift, 60, 100);
+      return { ...note, velocity: newVel };
+    } else {
+      // For "all" type, still make small changes
+      return {
+        pitch: pitch + (intensity <= 2 ? randomShift(1) : randomShift(intensity)),
+        duration: duration, // Keep same duration for conservative mutation
+        velocity: clamp(velocity + randomShift(intensity), 60, 100)
+      };
+    }
+  };
+
+  // Other utility functions remain the same
+  const randomShift = (max) => Math.floor(Math.random() * (max * 2 + 1)) - max;
+  const randomShiftIndex = (max) => Math.floor(Math.random() * (max * 2 + 1)) - max;
+  const clamp = (val, min, max) => Math.min(max, Math.max(min, val));
+
+  const getMutationIcon = () => {
+    switch (mutationType) {
+      case 'pitch':
+        return '↕️';
+      case 'duration':
+        return '↔️';
+      case 'velocity':
+        return '📊';
+      default:
+        return '🧬';
+    }
+  };
+
+  return (
+    <div className="mutation-controls">
+      <div className="mutation-header">
+        <h4>Mutation Controls</h4>
+      </div>
+
+      <div className="selected-note-info">
+        {selectedIndices.length === 0 ? (
+          <div className="mutation-instruction">
+            <i className="fas fa-arrow-up"></i> Click on a note above to select it for mutation
+          </div>
+        ) : selectedIndices.length === 1 ? (
+          <div className="selected-count">
+            <span className="count">1</span>
+            <span className="label">note selected (index: {selectedIndices[0]})</span>
+          </div>
+        ) : (
+          <div className="too-many-selected">
+            <i className="fas fa-exclamation-triangle"></i> 
+            <span>Too many notes selected ({selectedIndices.length}). Please select only one note.</span>
+          </div>
+        )}
+      </div>
+
+      <div className="mutation-options">
+        <div className="control-group">
+          <label>Mutation Type:</label>
+          <div className="custom-select">
+            <select value={mutationType} onChange={(e) => setMutationType(e.target.value)}>
+              <option value="pitch">Pitch</option>
+              <option value="duration">Duration</option>
+              <option value="velocity">Volume</option>
+              <option value="all">All Properties</option>
+            </select>
+            <div className="select-icon">{getMutationIcon()}</div>
+          </div>
+        </div>
+
+        <div className="control-group">
+          <label>Intensity: {intensity} {intensity <= 2 ? '(Minimal)' : ''}</label>
+          <div className="slider-container">
+            <input
+              type="range"
+              min="1"
+              max="10"
+              value={intensity}
+              onChange={(e) => setIntensity(parseInt(e.target.value))}
+            />
+            <div className="slider-labels">
+              <span>Subtle</span>
+              <span>Extreme</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button
+        className={`action-btn mutate ${selectedIndices.length !== 1 ? 'disabled' : ''}`}
+        onClick={handleMutate}
+        disabled={selectedIndices.length !== 1}
+      >
+        <i className="fas fa-dna"></i> Apply Mutation to Selected Note
+      </button>
+    </div>
+  );
+};
+
+
+
 
   const ScoreSlider = ({ onRate, initialValue = 50 }) => {
     const [score, setScore] = useState(initialValue);

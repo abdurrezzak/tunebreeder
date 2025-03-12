@@ -1981,3 +1981,45 @@
     color: var(--primary);
   }
 
+  /* Add these styles for the enhanced mutation controls */
+
+  .mutation-mode-toggle {
+    display: flex;
+    margin-left: auto;
+  }
+  
+  .mode-btn {
+    padding: 6px 12px;
+    background: var(--background);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    margin-left: 5px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .mode-btn.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+  }
+  
+  .mode-btn:hover:not(.active) {
+    background: var(--background-alt);
+  }
+  
+  .single-note-selector {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 15px;
+  }
+  
+  .single-note-selector input {
+    width: 100px;
+    padding: 8px;
+    margin-top: 5px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+  }
+

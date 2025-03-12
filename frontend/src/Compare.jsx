@@ -18,6 +18,9 @@ const Compare = () => {
   const [showMelodySelector, setShowMelodySelector] = useState(false);
   const [selectorType, setSelectorType] = useState('first'); // 'first' or 'second'
   const [user, setUser] = useState(null);
+  const [showFirstData, setShowFirstData] = useState(false);
+  const [showSecondData, setShowSecondData] = useState(false);
+  const [ancestryInfo, setAncestryInfo] = useState(null);
   
   // Refs
   const samplerRef = useRef(null);
@@ -103,6 +106,8 @@ const Compare = () => {
 
     setLoading(true);
     setError(null);
+    // Clear any previous ancestry info when starting a new comparison
+    setAncestryInfo(null);
 
     try {
       const token = localStorage.getItem('token');
@@ -149,10 +154,18 @@ const Compare = () => {
       const firstGenome = await firstResponse.json();
       const secondGenome = await secondResponse.json();
 
-      setMelodies({
+      const loadedMelodies = {
         first: firstGenome,
         second: secondGenome
-      });
+      };
+      
+      // Set melodies first
+      setMelodies(loadedMelodies);
+      
+      // Then immediately fetch the common ancestry with the loaded data instead of the state
+      // This avoids any timing issues with state updates
+      await fetchCommonAncestryWithData(loadedMelodies);
+      
     } catch (err) {
       console.error("Error fetching genomes:", err);
       setError(err.message);
@@ -308,9 +321,21 @@ const Compare = () => {
   };
 
   // --- StickRoll component for melody visualization ---
-  const StickRoll = ({ notes = [], playingIndex = -1 }) => {
+  const StickRoll = ({ notes = [], playingIndex = -1, otherNotes = [] }) => {
     const DURATION_SCALE = 80;
     const BASE_HEIGHT = 20;
+    
+    // Function to check if a note is different from the corresponding note in the other melody
+    const isDifferent = (note, index) => {
+      if (!otherNotes || index >= otherNotes.length) return false;
+      
+      const otherNote = otherNotes[index];
+      return (
+        note.pitch !== otherNote.pitch ||
+        note.duration !== otherNote.duration ||
+        note.velocity !== otherNote.velocity
+      );
+    };
     
     return (
       <div className="stickroll-container">
@@ -327,23 +352,160 @@ const Compare = () => {
           const lightness = 30 + (1 - normalizedPitch) * 30;
           const backgroundColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
           const barWidth = duration * DURATION_SCALE;
+          const different = isDifferent(note, i);
           
           return (
             <div
               key={i}
-              className={`stick ${i === playingIndex ? 'playing' : ''}`}
+              className={`stick ${i === playingIndex ? 'playing' : ''} ${different ? 'different' : ''}`}
               style={{
                 width: `${barWidth}px`,
                 height: `${BASE_HEIGHT}px`,
                 backgroundColor: backgroundColor,
               }}
-              title={`Pitch: ${pitch}, Dur: ${duration}, Vel: ${velocity}`}
+              title={`Pitch: ${pitch}, Dur: ${duration}, Vel: ${velocity}${different ? ' - Different from other melody' : ''}`}
             />
           );
         })}
       </div>
     );
   };
+
+// Replace the current AncestryTree component with this enhanced version
+
+// --- AncestryTree component for visualizing the common ancestor ---
+const AncestryTree = ({ ancestryInfo, melodyIds }) => {
+  console.log("AncestryTree rendering with:", { ancestryInfo, melodyIds });
+  
+  if (!ancestryInfo || !ancestryInfo.hasCommonAncestor || !ancestryInfo.commonAncestor) {
+    return null;
+  }
+  
+  // Extract the data we need
+  const commonAncestor = ancestryInfo.commonAncestor;
+  const firstMelodyId = parseInt(melodyIds.first);
+  const secondMelodyId = parseInt(melodyIds.second);
+  
+  // Use the ancestry paths if provided, otherwise just show the endpoints
+  const firstPath = ancestryInfo.firstPath || [];
+  const secondPath = ancestryInfo.secondPath || [];
+  
+  // Calculate generation differences for display
+  const firstGenDifference = ancestryInfo.firstGeneration - commonAncestor.generation || 0;
+  const secondGenDifference = ancestryInfo.secondGeneration - commonAncestor.generation || 0;
+  
+  return (
+    <div className="ancestry-tree">
+      <h3>Evolutionary Tree View</h3>
+      
+      <div className="tree-container">
+        {/* The common ancestor at the top */}
+        <div className="tree-level">
+          <div 
+            className="tree-node lca"
+            onClick={() => window.open(`/compare?first=${commonAncestor.id}&second=${melodyIds.first}`, '_blank')}
+          >
+            <div className="node-content">
+              <div className="node-title">Common Ancestor</div>
+              <div className="node-id">ID: {commonAncestor.id}</div>
+              <div className="node-gen">Gen {commonAncestor.generation}</div>
+              <div className="node-score"><i className="fas fa-star"></i> {Math.round(commonAncestor.score)}</div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Connecting lines from LCA */}
+        <div className="tree-connections">
+          <div className="line-left"></div>
+          <div className="line-right"></div>
+        </div>
+        
+        {/* Intermediate ancestors if available */}
+        {(firstPath.length > 0 || secondPath.length > 0) && (
+          <>
+            <div className="tree-level intermediate-level">
+              <div className="path-branch">
+                {firstPath.length > 0 ? (
+                  firstPath.map((ancestor, index) => (
+                    <div 
+                      key={`first-${ancestor.id}`} 
+                      className={`tree-node intermediate ${index === 0 ? 'first-intermediate' : ''}`}
+                    >
+                      <div className="node-content">
+                        <div className="node-id">ID: {ancestor.id}</div>
+                        <div className="node-gen">Gen {ancestor.generation}</div>
+                        <div className="node-score"><i className="fas fa-star"></i> {Math.round(ancestor.score)}</div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="direct-path">Direct descendant</div>
+                )}
+              </div>
+              
+              <div className="path-branch">
+                {secondPath.length > 0 ? (
+                  secondPath.map((ancestor, index) => (
+                    <div 
+                      key={`second-${ancestor.id}`} 
+                      className={`tree-node intermediate ${index === 0 ? 'first-intermediate' : ''}`}
+                    >
+                      <div className="node-content">
+                        <div className="node-id">ID: {ancestor.id}</div>
+                        <div className="node-gen">Gen {ancestor.generation}</div>
+                        <div className="node-score"><i className="fas fa-star"></i> {Math.round(ancestor.score)}</div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="direct-path">Direct descendant</div>
+                )}
+              </div>
+            </div>
+            
+            {/* Additional connecting lines */}
+            <div className="tree-connections">
+              <div className="line-left"></div>
+              <div className="line-right"></div>
+            </div>
+          </>
+        )}
+        
+        {/* Bottom level with the two compared melodies */}
+        <div className="tree-level bottom-level">
+          <div className="tree-node current">
+            <div className="node-content">
+              <div className="node-title">Melody 1</div>
+              <div className="node-id">ID: {firstMelodyId}</div>
+              <div className="node-gen">
+                Gen {ancestryInfo.firstGeneration || "?"}
+                <span className="gen-distance">
+                  ({firstGenDifference > 0 ? `+${firstGenDifference}` : firstGenDifference} gens)
+                </span>
+              </div>
+              <div className="node-score"><i className="fas fa-star"></i> {Math.round(ancestryInfo.firstScore || 0)}</div>
+            </div>
+          </div>
+          
+          <div className="tree-node current">
+            <div className="node-content">
+              <div className="node-title">Melody 2</div>
+              <div className="node-id">ID: {secondMelodyId}</div>
+              <div className="node-gen">
+                Gen {ancestryInfo.secondGeneration || "?"}
+                <span className="gen-distance">
+                  ({secondGenDifference > 0 ? `+${secondGenDifference}` : secondGenDifference} gens)
+                </span>
+              </div>
+              <div className="node-score"><i className="fas fa-star"></i> {Math.round(ancestryInfo.secondScore || 0)}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
   // --- MelodySelector component ---
   const MelodySelector = () => {
@@ -436,6 +598,93 @@ const Compare = () => {
 
     checkAuth();
   }, [navigate]);
+
+  // Add this function to the Compare component
+
+  // Modify the fetchCommonAncestry function to include more detailed logging
+
+const fetchCommonAncestryWithData = async (melodyData) => {
+  if (!melodyData.first || !melodyData.second) {
+    console.log("Cannot fetch ancestry: melody data not provided");
+    return;
+  }
+
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+
+    const url = `http://localhost:8000/api/genomes/common-ancestry?id1=${melodyData.first.id}&id2=${melodyData.second.id}`;
+    console.log(`Fetching common ancestry from: ${url}`);
+
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    console.log("Ancestry response status:", response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Error response from ancestry API:", errorText);
+      throw new Error(`Failed to fetch ancestry: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log("Ancestry data received:", data);
+    
+    // Add explicit checks on the data structure
+    if (data && typeof data === 'object') {
+      console.log("Data structure check: hasCommonAncestor property exists:", 'hasCommonAncestor' in data);
+      if ('hasCommonAncestor' in data && data.hasCommonAncestor) {
+        console.log("Common ancestor data exists:", !!data.commonAncestor);
+      }
+    }
+    
+    setAncestryInfo(data);
+  } catch (err) {
+    console.error("Error fetching common ancestry:", err);
+    setAncestryInfo({ 
+      hasCommonAncestor: false, 
+      error: err.message 
+    });
+  }
+};
+
+// Keep the old function for compatibility, but have it use the new one
+const fetchCommonAncestry = async () => {
+  if (!melodies.first || !melodies.second) {
+    console.log("Cannot fetch ancestry: melodies not loaded");
+    return;
+  }
+  
+  await fetchCommonAncestryWithData(melodies);
+};
+
+  // Add this effect to handle URL parameters
+
+  useEffect(() => {
+    // Extract melody IDs from URL parameters if present
+    const searchParams = new URLSearchParams(window.location.search);
+    const firstId = searchParams.get('first');
+    const secondId = searchParams.get('second');
+    
+    if (firstId) {
+      setMelodyIds(prev => ({ ...prev, first: firstId }));
+    }
+    if (secondId) {
+      setMelodyIds(prev => ({ ...prev, second: secondId }));
+    }
+    
+    // If both IDs are present, fetch the genomes automatically
+    if (firstId && secondId) {
+      fetchGenomes();
+    }
+  }, []);
 
   return (
     <div className={`compare-page ${darkMode ? 'dark-mode' : ''}`}>
@@ -545,6 +794,39 @@ const Compare = () => {
               </button>
             </div>
 
+            {ancestryInfo && (
+              <div className={`ancestry-section ${ancestryInfo.hasCommonAncestor ? 'has-ancestor' : 'no-ancestor'}`}>
+                <div className="ancestry-info">
+                  <i className={ancestryInfo.hasCommonAncestor ? 'fas fa-link' : 'fas fa-unlink'}></i>
+                  {ancestryInfo.hasCommonAncestor ? (
+                    <>
+                      <p>These melodies share a common ancestor (ID: {ancestryInfo.commonAncestor.id}) from generation {ancestryInfo.commonAncestor.generation}</p>
+                      <button className="view-ancestor-btn" onClick={() => navigate(`/compare?first=${ancestryInfo.commonAncestor.id}&second=${melodyIds.first}`)}>
+                        <i className="fas fa-code-branch"></i> Compare with Common Ancestor
+                      </button>
+                    </>
+                  ) : (
+                    <p>{ancestryInfo.message || "These melodies don't share a common ancestor or are from different experiments."}</p>
+                  )}
+                </div>
+                
+                
+                
+                {/* Explicitly check the condition again */}
+                {ancestryInfo.hasCommonAncestor && <p>Tree should be rendered below...</p>}
+                
+                {/* Add the tree visualization if there's a common ancestor */}
+                {ancestryInfo.hasCommonAncestor && (
+                  <AncestryTree 
+                    ancestryInfo={ancestryInfo}
+                    melodyIds={melodyIds}
+                  />
+                )}
+                
+                
+              </div>
+            )}
+
             <div className="melodies-comparison">
               <div className="melody-column">
                 <div className="melody-heading">
@@ -557,7 +839,23 @@ const Compare = () => {
                 <StickRoll 
                   notes={genomeToNotes(melodies.first.data)}
                   playingIndex={playingIndices.first}
+                  otherNotes={genomeToNotes(melodies.second.data)}
                 />
+                
+                <div className="notes-data">
+                  <div className="notes-data-header">
+                    <h4>Note Details</h4>
+                    <button 
+                      className="toggle-data-btn"
+                      onClick={() => setShowFirstData(!showFirstData)}
+                    >
+                      {showFirstData ? <i className="fas fa-chevron-up"></i> : <i className="fas fa-chevron-down"></i>}
+                    </button>
+                  </div>
+                  {showFirstData && (
+                    <pre className="notes-json">{JSON.stringify(genomeToNotes(melodies.first.data), null, 2)}</pre>
+                  )}
+                </div>
               </div>
 
               <div className="melody-column">
@@ -571,7 +869,23 @@ const Compare = () => {
                 <StickRoll 
                   notes={genomeToNotes(melodies.second.data)}
                   playingIndex={playingIndices.second}
+                  otherNotes={genomeToNotes(melodies.first.data)}
                 />
+                
+                <div className="notes-data">
+                  <div className="notes-data-header">
+                    <h4>Note Details</h4>
+                    <button 
+                      className="toggle-data-btn"
+                      onClick={() => setShowSecondData(!showSecondData)}
+                    >
+                      {showSecondData ? <i className="fas fa-chevron-up"></i> : <i className="fas fa-chevron-down"></i>}
+                    </button>
+                  </div>
+                  {showSecondData && (
+                    <pre className="notes-json">{JSON.stringify(genomeToNotes(melodies.second.data), null, 2)}</pre>
+                  )}
+                </div>
               </div>
             </div>
           </div>

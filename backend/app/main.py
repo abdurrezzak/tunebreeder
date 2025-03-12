@@ -614,7 +614,198 @@ def startup_event():
         db.close()
 
 
-# Add this new endpoint after the existing genome endpoints
+# Add more detailed logging to the get_common_ancestry function
+
+# Update the get_common_ancestry function to include ancestry paths
+
+@app.get("/api/genomes/common-ancestry")
+def get_common_ancestry(
+    id1: int,
+    id2: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_active_user)
+):
+    """Find the lowest common ancestor between two genomes if it exists"""
+    print(f"\n----- Looking for common ancestor between genomes {id1} and {id2} -----")
+    
+    try:
+        # Get both genomes first
+        genome1 = db.query(models.Genome).filter(models.Genome.id == id1).first()
+        genome2 = db.query(models.Genome).filter(models.Genome.id == id2).first()
+        
+        print(f"Genome1 found: {genome1 is not None}, Genome2 found: {genome2 is not None}")
+        
+        if not genome1 or not genome2:
+            missing_id = id1 if not genome1 else id2
+            print(f"Genome with ID {missing_id} not found")
+            raise HTTPException(status_code=404, detail=f"Genome with ID {missing_id} not found")
+        
+        # Check if they're from the same experiment
+        genome1_experiment = db.query(models.GenomeExperiment).filter(
+            models.GenomeExperiment.genome_id == genome1.id
+        ).first()
+        
+        genome2_experiment = db.query(models.GenomeExperiment).filter(
+            models.GenomeExperiment.genome_id == genome2.id
+        ).first()
+        
+        print(f"Genome1 experiment: {genome1_experiment is not None}, Genome2 experiment: {genome2_experiment is not None}")
+        
+        # If either doesn't belong to an experiment or they're from different experiments
+        if (not genome1_experiment or not genome2_experiment):
+            print("One or both genomes don't belong to any experiment")
+            return {
+                "hasCommonAncestor": False,
+                "message": "These melodies are from different experiments or populations."
+            }
+            
+        if (genome1_experiment.experiment_id != genome2_experiment.experiment_id):
+            print(f"Genomes are from different experiments: {genome1_experiment.experiment_id} vs {genome2_experiment.experiment_id}")
+            return {
+                "hasCommonAncestor": False,
+                "message": "These melodies are from different experiments or populations."
+            }
+        
+        # For first genome, track both ancestors and path to each ancestor
+        ancestors_set1 = set()
+        paths_to_ancestors = {}  # Dict mapping ancestor_id -> path from genome1
+        
+        def collect_ancestors_with_paths(genome_id, ancestors_set, current_path=None):
+            """Recursively collect ancestors with paths"""
+            if current_path is None:
+                current_path = []
+                
+            genome = db.query(models.Genome).filter(models.Genome.id == genome_id).first()
+            if not genome:
+                return
+            
+            # For each parent, record path and continue recursion
+            for parent_attr, parent_id in [('parent1_id', genome.parent1_id), ('parent2_id', genome.parent2_id)]:
+                if parent_id:
+                    parent = db.query(models.Genome).filter(models.Genome.id == parent_id).first()
+                    if parent:
+                        ancestors_set.add(parent_id)
+                        
+                        # Store path to this ancestor (copy to avoid shared references)
+                        parent_path = current_path.copy()
+                        parent_path.append({
+                            "id": parent.id,
+                            "generation": parent.generation,
+                            "score": parent.score
+                        })
+                        paths_to_ancestors[parent_id] = parent_path
+                        
+                        # Continue recursion
+                        collect_ancestors_with_paths(parent_id, ancestors_set, parent_path)
+        
+        # Collect ancestors for first genome with paths
+        collect_ancestors_with_paths(genome1.id, ancestors_set1)
+        print(f"Collected {len(ancestors_set1)} ancestors for genome {id1}")
+        
+        # Find common ancestor by traversing genome2's ancestry
+        common_ancestors = []
+        
+        # For the second genome, also track paths
+        paths_from_genome2 = {}  # Dict mapping ancestor_id -> path from genome2
+        
+        def find_common_ancestors_with_paths(genome_id, common_ancestors_list, current_path=None):
+            """Find common ancestors with paths"""
+            if current_path is None:
+                current_path = []
+                
+            if genome_id in ancestors_set1:
+                # This is a common ancestor
+                genome = db.query(models.Genome).filter(models.Genome.id == genome_id).first()
+                if genome:
+                    ancestor_info = {
+                        "id": genome.id,
+                        "generation": genome.generation,
+                        "score": genome.score
+                    }
+                    common_ancestors_list.append(ancestor_info)
+                    
+                    # Store path to this common ancestor
+                    path_from_genome2 = current_path.copy()
+                    path_from_genome2.append(ancestor_info)
+                    paths_from_genome2[genome_id] = path_from_genome2
+            
+            # Continue traversing up
+            genome = db.query(models.Genome).filter(models.Genome.id == genome_id).first()
+            if not genome:
+                return
+            
+            # For each parent, record path and continue recursion
+            for parent_attr, parent_id in [('parent1_id', genome.parent1_id), ('parent2_id', genome.parent2_id)]:
+                if parent_id:
+                    parent = db.query(models.Genome).filter(models.Genome.id == parent_id).first()
+                    if parent:
+                        # Create path entry for this parent
+                        parent_path = current_path.copy()
+                        parent_path.append({
+                            "id": parent.id,
+                            "generation": parent.generation,
+                            "score": parent.score
+                        })
+                        
+                        # Continue recursion with updated path
+                        find_common_ancestors_with_paths(parent_id, common_ancestors_list, parent_path)
+        
+        # Start with genome2 itself (in case one is ancestor of another)
+        genome2_path_entry = {
+            "id": genome2.id,
+            "generation": genome2.generation,
+            "score": genome2.score
+        }
+        
+        if genome2.id in ancestors_set1:
+            common_ancestors.append(genome2_path_entry)
+            # Special case: genome2 is already in ancestry of genome1
+            paths_from_genome2[genome2.id] = [genome2_path_entry]
+            print(f"Genome {id2} is directly in the ancestry of genome {id1}")
+        else:
+            find_common_ancestors_with_paths(genome2.id, common_ancestors, [genome2_path_entry])
+        
+        # If we found any common ancestors
+        if common_ancestors:
+            # Sort by generation, highest first (most recent common ancestor)
+            common_ancestors.sort(key=lambda x: x["generation"], reverse=True)
+            
+            # Get the most recent common ancestor
+            lca = common_ancestors[0]
+            lca_id = lca["id"]
+            
+            # Construct paths from both genomes to the LCA
+            # For genome1, we need to reverse the path since we stored ancestor->genome1 paths
+            path1_to_lca = paths_to_ancestors.get(lca_id, [])[::-1]  # Reverse to get genome1->ancestor path
+            path2_to_lca = paths_from_genome2.get(lca_id, [])[:-1]  # Exclude LCA as it's returned separately
+            
+            print(f"Found common ancestor for genomes {id1} and {id2}: {lca_id}")
+            print(f"Path length from genome1 to LCA: {len(path1_to_lca)}")
+            print(f"Path length from genome2 to LCA: {len(path2_to_lca)}")
+            
+            return {
+                "hasCommonAncestor": True,
+                "commonAncestor": lca,
+                "allCommonAncestors": common_ancestors,
+                "firstGeneration": genome1.generation,
+                "secondGeneration": genome2.generation,
+                "firstScore": genome1.score,
+                "secondScore": genome2.score,
+                "firstPath": path1_to_lca,  # Path from genome1 to LCA (excluding endpoints)
+                "secondPath": path2_to_lca  # Path from genome2 to LCA (excluding endpoints)
+            }
+        else:
+            return {
+                "hasCommonAncestor": False,
+                "message": "These melodies share the same experiment but have no common ancestor."
+            }
+    except Exception as e:
+        print(f"Exception in common ancestry endpoint: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+
 
 @app.get("/api/genome/{genome_id}")
 def get_genome_by_id(
