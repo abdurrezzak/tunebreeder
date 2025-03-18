@@ -1,0 +1,201 @@
+.melody-mutate-page {
+  min-height: 100vh;
+  color: var(--text, #333);
+  background-color: var(--background, #f5f5f5);
+}
+
+.mutate-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.genome-display {
+  background: var(--card-background, #fff);
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.genome-display h2 {
+  margin-top: 0;
+  color: var(--text, #333);
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+}
+
+.mutation-section, .rating-section {
+  background: var(--card-background, #fff);
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.mutation-section h2, .rating-section h2 {
+  margin-top: 0;
+  color: var(--text, #333);
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+}
+
+.instruction {
+  margin-bottom: 1.5rem;
+  color: var(--text-secondary, #666);
+  font-size: 1rem;
+}
+
+.play-save-container {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.action-btn {
+  padding: 0.8rem 1.5rem;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 1rem;
+}
+
+.action-btn.play {
+  background-color: var(--primary, #6c63ff);
+  color: white;
+}
+
+.action-btn.play.playing {
+  background-color: #ff5252;
+}
+
+.action-btn.play:hover {
+  background-color: var(--primary-dark, #5046e4);
+  transform: translateY(-2px);
+}
+
+.action-btn.mutate {
+  background-color: #ff9800;
+  color: white;
+}
+
+.action-btn.mutate:hover {
+  background-color: #f57c00;
+  transform: translateY(-2px);
+}
+
+.action-btn.rate {
+  background-color: #4caf50;
+  color: white;
+}
+
+.action-btn.rate:hover {
+  background-color: #388e3c;
+  transform: translateY(-2px);
+}
+
+.action-btn:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.mutation-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.control-group label {
+  min-width: 150px;
+  color: var(--text, #333);
+  font-weight: 500;
+}
+
+.slider, .rating-slider {
+  flex: 1;
+  height: 8px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: #ddd;
+  outline: none;
+  border-radius: 4px;
+}
+
+.slider::-webkit-slider-thumb, .rating-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--primary, #6c63ff);
+  cursor: pointer;
+}
+
+.strength-value, .rating-value {
+  min-width: 60px;
+  text-align: center;
+  font-weight: 600;
+  color: var(--text, #333);
+}
+
+.rating-slider-container {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.rating-slider {
+  flex: 1;
+  background: linear-gradient(to right, #ff5252 0%, #ffeb3b 50%, #4caf50 100%);
+}
+
+/* Dark mode styles */
+.dark-mode .melody-mutate-page {
+  color: var(--text, #eaeaea);
+  background-color: var(--background, #1a1a1a);
+}
+
+.dark-mode .genome-display,
+.dark-mode .mutation-section,
+.dark-mode .rating-section {
+  background: var(--card-background, #2d2d2d);
+}
+
+.dark-mode .instruction {
+  color: var(--text-secondary, #aaaaaa);
+}
+
+.dark-mode .slider,
+.dark-mode .rating-slider {
+  background: #444;
+}
+
+.dark-mode .strength-value,
+.dark-mode .rating-value {
+  color: var(--text, #eaeaea);
+}
+
+@media (max-width: 768px) {
+  .mutate-content {
+    padding: 1rem;
+  }
+  
+  .control-group {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .control-group label {
+    margin-bottom: 0.5rem;
+  }
+}

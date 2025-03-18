@@ -45,6 +45,8 @@ const famousMelody = [
   { pitch: 60, duration: 1.0, velocity: 80 }
 ];
 
+const apiUrl = process.env.REACT_APP_API_URL || "http://localhost:8000";
+
 const HomePage = () => {
   const { darkMode } = useContext(ThemeContext);
   // --- State Variables ---
@@ -66,6 +68,7 @@ const HomePage = () => {
   const [showExperimentSelection, setShowExperimentSelection] = useState(true);
   const [userContributions, setUserContributions] = useState({});
   const [countdownActive, setCountdownActive] = useState(false);
+  const [isFinalPiece, setIsFinalPiece] = useState(false);
 
   // Countdown states
   const [nextUpdateTime, setNextUpdateTime] = useState(null);
@@ -160,7 +163,7 @@ const HomePage = () => {
   const fetchLeaderboard = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/leaderboard', {
+      const response = await fetch(`${apiUrl}/api/leaderboard`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) throw new Error("Failed to fetch leaderboard");
@@ -174,7 +177,7 @@ const HomePage = () => {
   const fetchLatestPlaylist = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/melody/latest', {
+      const response = await fetch(`${apiUrl}/api/melody/latest`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) throw new Error("Failed to fetch latest playlist");
@@ -192,7 +195,7 @@ const HomePage = () => {
         window.location.href = '/login';
         return;
       }
-      const response = await fetch('http://localhost:8000/api/users/me', {
+      const response = await fetch(`${apiUrl}/api/users/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) {
@@ -222,7 +225,7 @@ const HomePage = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/genome/current', {
+      const response = await fetch(`${apiUrl}/api/genome/current`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) throw new Error('Failed to fetch current genome');
@@ -240,7 +243,7 @@ const HomePage = () => {
   const fetchSavedMelodies = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/melody/saved', {
+      const response = await fetch(`${apiUrl}/api/melody/saved`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) throw new Error('Failed to fetch saved melodies');
@@ -260,8 +263,8 @@ const HomePage = () => {
     fetchUserData();
   }, []);
 
-
   // Add this useEffect to load contributions from localStorage
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     // Load previously saved contributions from localStorage
     const storedContributions = localStorage.getItem('userContributions');
@@ -278,32 +281,20 @@ const HomePage = () => {
     }
   }, []);
 
-
   // --- Countdown Timer useEffect ---
+  // (This effect is no longer used to update a countdown, but you may still update nextUpdateTime as needed)
   useEffect(() => {
     let interval;
     if (countdownActive && nextUpdateTime) {
-      interval = setInterval(() => {
-        const now = new Date();
-        const timeLeft = nextUpdateTime - now;
-        if (timeLeft <= 0) {
-          clearInterval(interval);
-          setCountdownTime('0:00');
-        } else {
-          setCountdownTime(formatCountdown(timeLeft));
-        }
-      }, 1000);
+      // Previously we updated a live countdown.
+      // Now we don't need to update the display continuously.
+      // You may remove this effect if you no longer want any updates.
+      setCountdownTime(nextUpdateTime.toLocaleTimeString());
     }
     return () => {
       if (interval) clearInterval(interval);
     };
   }, [countdownActive, nextUpdateTime]);
-
-  const formatCountdown = (timeLeft) => {
-    const minutes = Math.floor(timeLeft / 60000);
-    const seconds = Math.floor((timeLeft % 60000) / 1000);
-    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-  };
 
   // --- Audio Playback Functions ---
   const playNote = (note) => {
@@ -389,7 +380,7 @@ const HomePage = () => {
     try {
       const token = localStorage.getItem('token');
       const mutationData = JSON.stringify(mutatedGenomeArray);
-      const response = await fetch(`http://localhost:8000/api/genome/${currentGenome.id}/mutate`, {
+      const response = await fetch(`${apiUrl}/api/genome/${currentGenome.id}/mutate`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -421,9 +412,13 @@ const HomePage = () => {
             }));
           }
           
-          // Set countdown information
+          // Set countdown information with fallback if needed
           if (errorData.next_update) {
-            setNextUpdateTime(new Date(errorData.next_update));
+            let nextUpdate = new Date(errorData.next_update);
+            if (nextUpdate <= new Date()) {
+              nextUpdate = new Date(Date.now() + 180000);
+            }
+            setNextUpdateTime(nextUpdate);
           }
           setCountdownActive(true);
           
@@ -453,8 +448,12 @@ const HomePage = () => {
         localStorage.setItem('userContributions', JSON.stringify(storedContributions));
       }
       
-      // Set countdown information
-      setNextUpdateTime(new Date(data.next_update));
+      // Set countdown information with fallback if needed
+      let nextUpdate = new Date(data.next_update);
+      if (nextUpdate <= new Date()) {
+        nextUpdate = new Date(Date.now() + 180000);
+      }
+      setNextUpdateTime(nextUpdate);
       setCountdownActive(true);
       return data;
     } catch (err) {
@@ -462,9 +461,6 @@ const HomePage = () => {
       throw err;
     }
   };
-
-
-
 
   const handleAdvancedMutation = async (mutatedGenome) => {
     if (!currentGenome || !userRating || !scoreSubmitted) {
@@ -486,71 +482,70 @@ const HomePage = () => {
   };
 
   // Update the mutateGenome function to use conservative mutations
-
-const mutateGenome = async () => {
-  if (!currentGenome || !userRating || !scoreSubmitted) {
-    alert('Please rate the melody before mutating');
-    return;
-  }
-  try {
-    setIsMutating(true);
-    const genomeArray = genomeToNotes(currentGenome.data);
-    
-    // Apply conservative mutations to only a few random notes
-    const mutatedGenome = [...genomeArray]; // Create a copy
-    
-    // Select a small number of notes to mutate (2-5)
-    const numNotesToMutate = Math.floor(Math.random() * 4) + 2; // 2 to 5 notes
-    const notesToMutate = [];
-    
-    while (notesToMutate.length < numNotesToMutate) {
-      const idx = Math.floor(Math.random() * genomeArray.length);
-      if (!notesToMutate.includes(idx)) {
-        notesToMutate.push(idx);
-      }
+  const mutateGenome = async () => {
+    if (!currentGenome || !userRating || !scoreSubmitted) {
+      alert('Please rate the melody before mutating');
+      return;
     }
-    
-    // Apply small changes to those notes
-    notesToMutate.forEach(idx => {
-      const gene = genomeArray[idx];
-      const pitch = gene.pitch || Math.round(gene.frequency || 60);
-      const velocity = gene.velocity || 80;
+    try {
+      setIsMutating(true);
+      const genomeArray = genomeToNotes(currentGenome.data);
       
-      // Small pitch change (-2 to +2 semitones)
-      const pitchChange = Math.floor(Math.random() * 5) - 2;
+      // Apply conservative mutations to only a few random notes
+      const mutatedGenome = [...genomeArray]; // Create a copy
       
-      // Small velocity change (-5 to +5)
-      const velocityChange = Math.floor(Math.random() * 11) - 5;
+      // Select a small number of notes to mutate (2-5)
+      const numNotesToMutate = Math.floor(Math.random() * 4) + 2; // 2 to 5 notes
+      const notesToMutate = [];
       
-      // Duration might sometimes change but keep the same most of the time
-      const duration = gene.duration || 0.5;
-      const durations = [0.25, 0.5, 1, 2];
-      const currentDurationIdx = durations.indexOf(duration);
-      let newDurationIdx = currentDurationIdx;
-      
-      // Only 20% chance to change duration
-      if (Math.random() < 0.2 && currentDurationIdx >= 0) {
-        newDurationIdx = Math.max(0, Math.min(durations.length - 1, 
-          currentDurationIdx + (Math.random() < 0.5 ? 1 : -1)));
+      while (notesToMutate.length < numNotesToMutate) {
+        const idx = Math.floor(Math.random() * genomeArray.length);
+        if (!notesToMutate.includes(idx)) {
+          notesToMutate.push(idx);
+        }
       }
       
-      mutatedGenome[idx] = {
-        pitch: Math.max(36, Math.min(84, pitch + pitchChange)),
-        duration: durations[newDurationIdx],
-        velocity: Math.max(60, Math.min(100, velocity + velocityChange))
-      };
-    });
-    
-    await submitMutation(mutatedGenome, userRating);
-    setUserRating(null);
-    setScoreSubmitted(false);
-  } catch (err) {
-    console.error('Error mutating genome:', err);
-    alert(`Mutation failed: ${err.message}`);
-  } finally {
-    setIsMutating(false);
-  }
-};
+      // Apply small changes to those notes
+      notesToMutate.forEach(idx => {
+        const gene = genomeArray[idx];
+        const pitch = gene.pitch || Math.round(gene.frequency || 60);
+        const velocity = gene.velocity || 80;
+        
+        // Small pitch change (-2 to +2 semitones)
+        const pitchChange = Math.floor(Math.random() * 5) - 2;
+        
+        // Small velocity change (-5 to +5)
+        const velocityChange = Math.floor(Math.random() * 11) - 5;
+        
+        // Duration might sometimes change but keep the same most of the time
+        const duration = gene.duration || 0.5;
+        const durations = [0.25, 0.5, 1, 2];
+        const currentDurationIdx = durations.indexOf(duration);
+        let newDurationIdx = currentDurationIdx;
+        
+        // Only 20% chance to change duration
+        if (Math.random() < 0.2 && currentDurationIdx >= 0) {
+          newDurationIdx = Math.max(0, Math.min(durations.length - 1, 
+            currentDurationIdx + (Math.random() < 0.5 ? 1 : -1)));
+        }
+        
+        mutatedGenome[idx] = {
+          pitch: Math.max(36, Math.min(84, pitch + pitchChange)),
+          duration: durations[newDurationIdx],
+          velocity: Math.max(60, Math.min(100, velocity + velocityChange))
+        };
+      });
+      
+      await submitMutation(mutatedGenome, userRating);
+      setUserRating(null);
+      setScoreSubmitted(false);
+    } catch (err) {
+      console.error('Error mutating genome:', err);
+      alert(`Mutation failed: ${err.message}`);
+    } finally {
+      setIsMutating(false);
+    }
+  };
 
   const saveMelody = async () => {
     if (!currentGenome) return;
@@ -559,7 +554,7 @@ const mutateGenome = async () => {
     const description = prompt('Add a description (optional):');
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/melody/save', {
+      const response = await fetch(`${apiUrl}/api/melody/save`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -586,7 +581,6 @@ const mutateGenome = async () => {
   };
 
   // Update handleToggleNote to allow only one selection at a time
-
   const handleToggleNote = (index) => {
     setSelectedIndices((prev) => {
       // If clicking on an already selected note, deselect it
@@ -598,21 +592,46 @@ const mutateGenome = async () => {
     });
   };
 
+  // In HomePage.jsx, update the fetchNextUpdateTime function:
   const fetchNextUpdateTime = async (experimentId) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8000/api/experiment/${experimentId}/next-update`, {
+      
+      // Request the contribution status specifically for this experiment
+      const contributionCheckUrl = `${apiUrl}/api/experiments/${experimentId}/generation/${currentGenome.generation}/contribution`;
+      const contributionResponse = await fetch(contributionCheckUrl, {
         headers: { Authorization: `Bearer ${token}` },
       });
       
-      if (!response.ok) throw new Error('Failed to fetch next update time');
+      if (!contributionResponse.ok) throw new Error('Failed to check contribution status');
+      const contributionData = await contributionResponse.json();
       
-      const data = await response.json();
-      if (data.next_update) {
-        setNextUpdateTime(new Date(data.next_update));
+      // Always ensure we have a valid future time
+      let nextTime;
+      if (contributionData.next_update) {
+        nextTime = new Date(contributionData.next_update);
+        // If the provided time is in the past, use a fallback
+        if (nextTime <= new Date()) {
+          nextTime = new Date(Date.now() + 180000); // 3 minutes from now
+          console.log("Using fallback time (server provided time was in the past):", nextTime);
+        }
+      } else {
+        // If no time provided, use a fallback 3 minutes from now
+        nextTime = new Date(Date.now() + 180000);
+        console.log("Using fallback time (no time provided by server):", nextTime);
       }
+      
+      setNextUpdateTime(nextTime);
+      // Store with experiment-specific key
+      localStorage.setItem(`experiment_${experimentId}_next_update`, nextTime.toISOString());
+      
     } catch (err) {
       console.error('Error fetching next update time:', err);
+      // Always ensure we set a valid future time
+      const fallback = new Date();
+      fallback.setMinutes(fallback.getMinutes() + 3);
+      setNextUpdateTime(fallback);
+      localStorage.setItem(`experiment_${experimentId}_next_update`, fallback.toISOString());
     }
   };
 
@@ -635,9 +654,24 @@ const mutateGenome = async () => {
           }));
         }
         
-        // Activate countdown and fetch the latest next update time
+        // Activate countdown
         setCountdownActive(true);
-        fetchNextUpdateTime(genome.experiment_id);
+        
+        // Try to get the stored next update time first
+        const storedTime = localStorage.getItem(`experiment_${genome.experiment_id}_next_update`);
+        if (storedTime) {
+          const nextTime = new Date(storedTime);
+          // Only use the stored time if it's in the future
+          if (nextTime > new Date()) {
+            setNextUpdateTime(nextTime);
+          } else {
+            // If stored time is in the past, fetch the latest from server
+            fetchNextUpdateTime(genome.experiment_id);
+          }
+        } else {
+          // No stored time, fetch from server
+          fetchNextUpdateTime(genome.experiment_id);
+        }
       } else {
         setCountdownActive(false);
       }
@@ -646,12 +680,11 @@ const mutateGenome = async () => {
     }
   };
 
-  // Add this expanded function to handle genome selection with contribution status
   const onSelectGenomeWithContribution = (genome, hasContributed, nextUpdateTime = null) => {
     setCurrentGenome(genome);
     setShowExperimentSelection(false);
     
-    if (hasContributed) {
+    if (hasContributed && genome.experiment_id) {
       // Update the contribution in state
       const contributionKey = `${genome.experiment_id}_${genome.generation}`;
       setUserContributions(prev => ({
@@ -665,6 +698,8 @@ const mutateGenome = async () => {
       // Set next update time if provided
       if (nextUpdateTime) {
         setNextUpdateTime(nextUpdateTime);
+        // Store with experiment-specific key
+        localStorage.setItem(`experiment_${genome.experiment_id}_next_update`, nextUpdateTime.toISOString());
       } else {
         // Fetch the next update time if not provided
         fetchNextUpdateTime(genome.experiment_id);
@@ -672,6 +707,18 @@ const mutateGenome = async () => {
     } else {
       setCountdownActive(false);
     }
+  };
+
+  // Add this to your component to handle displaying a final piece
+  const handleFinalPiece = (genome) => {
+    setCurrentGenome(genome);
+    setShowExperimentSelection(false);
+    setIsFinalPiece(true);
+    
+    // Reset other state as needed
+    setSelectedIndices([]);
+    setUserRating(null);
+    setCountdownActive(false);
   };
 
   // --- Sub-Components ---
@@ -719,13 +766,42 @@ const mutateGenome = async () => {
     );
   };
 
-  const GenomeTitle = ({ genome }) => (
-    <div className="genome-title">
-      <h3>
-        Generation {genome.generation} - Genome {genome.id}
-      </h3>
-    </div>
-  );
+  const GenomeTitle = ({ genome }) => {
+    const [experimentName, setExperimentName] = useState('');
+    
+    useEffect(() => {
+      if (genome && genome.experiment_id) {
+        const fetchExperimentName = async () => {
+          try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`${apiUrl}/api/experiments/${genome.experiment_id}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            
+            if (response.ok) {
+              const experimentData = await response.json();
+              setExperimentName(experimentData.name || `Experiment ${genome.experiment_id}`);
+            }
+          } catch (err) {
+            console.error('Error fetching experiment name:', err);
+            setExperimentName(`Experiment ${genome.experiment_id}`);
+          }
+        };
+        
+        fetchExperimentName();
+      }
+    }, [genome]);
+    
+    return (
+      <div className="genome-title">
+        <h3>{experimentName || 'Unknown Experiment'}</h3>
+        <div className="genome-subtitle">
+          <span className="genome-id">Genome ID: {genome.id}</span>
+          <span className="genome-generation">Generation: {genome.generation}</span>
+        </div>
+      </div>
+    );
+  };
 
   const StickRoll = ({ notes = [], playingIndex, selectedIndices, onToggleNote }) => {
     const DURATION_SCALE = 80;
@@ -783,161 +859,157 @@ const mutateGenome = async () => {
     );
   };
 
-// Update the MutationControls component
-// Simplify the MutationControls component
-
-const MutationControls = ({ genome, selectedIndices, onMutate }) => {
-  const [mutationType, setMutationType] = useState('pitch');
-  const [intensity, setIntensity] = useState(2);  // Default to lower intensity for more controlled mutations
-  
-  // Remove mutation mode state and just use selectedIndices
-  
-  const handleMutate = () => {
-    if (!genome?.data) return;
-    const originalData = Array.isArray(genome.data)
-      ? genome.data
-      : JSON.parse(genome.data);
+  // Update the MutationControls component
+  // Simplify the MutationControls component
+  const MutationControls = ({ genome, selectedIndices, onMutate }) => {
+    const [mutationType, setMutationType] = useState('pitch');
+    const [intensity, setIntensity] = useState(2);  // Default to lower intensity for more controlled mutations
     
-    if (selectedIndices.length === 0) {
-      alert("Please select a note to mutate by clicking on it in the melody display.");
-      return;
-    }
+    // Remove mutation mode state and just use selectedIndices
     
-    if (selectedIndices.length > 1) {
-      alert("Please select only one note at a time. Click notes to deselect them.");
-      return;
-    }
-    
-    // We know there's exactly one selected note
-    const indexToMutate = selectedIndices[0];
-    
-    const mutated = originalData.map((note, i) => {
-      if (i !== indexToMutate) return { ...note };
-      return applyMutation(note);
-    });
-    
-    onMutate(mutated);
-  };
+    const handleMutate = () => {
+      if (!genome?.data) return;
+      const originalData = Array.isArray(genome.data)
+        ? genome.data
+        : JSON.parse(genome.data);
+      
+      if (selectedIndices.length === 0) {
+        alert("Please select a note to mutate by clicking on it in the melody display.");
+        return;
+      }
+      
+      if (selectedIndices.length > 1) {
+        alert("Please select only one note at a time. Click notes to deselect them.");
+        return;
+      }
+      
+      // We know there's exactly one selected note
+      const indexToMutate = selectedIndices[0];
+      
+      const mutated = originalData.map((note, i) => {
+        if (i !== indexToMutate) return { ...note };
+        return applyMutation(note);
+      });
+      
+      onMutate(mutated);
+    };
 
-  const applyMutation = (note) => {
-    const pitch = note.pitch || Math.round(note.frequency || 60);
-    const duration = note.duration || 0.5;
-    const velocity = note.velocity || 80;
-    
-    if (mutationType === 'pitch') {
-      // More precise pitch control for fine-grained evolution
-      const pitchShift = intensity <= 2 ? randomShift(1) : randomShift(intensity); 
-      return { ...note, pitch: pitch + pitchShift };
-    } else if (mutationType === 'duration') {
-      const durationOptions = [0.25, 0.5, 1, 2];
-      const idx = durationOptions.indexOf(duration);
-      // For very low intensity, only change by at most 1 duration step
-      let newIdx = intensity <= 2 ? idx + (Math.random() < 0.5 ? 1 : -1) : idx + randomShiftIndex(intensity);
-      if (newIdx < 0) newIdx = 0;
-      if (newIdx >= durationOptions.length) newIdx = durationOptions.length - 1;
-      return { ...note, duration: durationOptions[newIdx] };
-    } else if (mutationType === 'velocity') {
-      // More precise velocity control
-      const velocityShift = intensity <= 2 ? randomShift(5) : randomShift(intensity * 5);
-      const newVel = clamp(velocity + velocityShift, 60, 100);
-      return { ...note, velocity: newVel };
-    } else {
-      // For "all" type, still make small changes
-      return {
-        pitch: pitch + (intensity <= 2 ? randomShift(1) : randomShift(intensity)),
-        duration: duration, // Keep same duration for conservative mutation
-        velocity: clamp(velocity + randomShift(intensity), 60, 100)
-      };
-    }
-  };
+    const applyMutation = (note) => {
+      const pitch = note.pitch || Math.round(note.frequency || 60);
+      const duration = note.duration || 0.5;
+      const velocity = note.velocity || 80;
+      
+      if (mutationType === 'pitch') {
+        // More precise pitch control for fine-grained evolution
+        const pitchShift = intensity <= 2 ? randomShift(1) : randomShift(intensity); 
+        return { ...note, pitch: pitch + pitchShift };
+      } else if (mutationType === 'duration') {
+        const durationOptions = [0.25, 0.5, 1, 2];
+        const idx = durationOptions.indexOf(duration);
+        // For very low intensity, only change by at most 1 duration step
+        let newIdx = intensity <= 2 ? idx + (Math.random() < 0.5 ? 1 : -1) : idx + randomShiftIndex(intensity);
+        if (newIdx < 0) newIdx = 0;
+        if (newIdx >= durationOptions.length) newIdx = durationOptions.length - 1;
+        return { ...note, duration: durationOptions[newIdx] };
+      } else if (mutationType === 'velocity') {
+        // More precise velocity control
+        const velocityShift = intensity <= 2 ? randomShift(5) : randomShift(intensity * 5);
+        const newVel = clamp(velocity + velocityShift, 60, 100);
+        return { ...note, velocity: newVel };
+      } else {
+        // For "all" type, still make small changes
+        return {
+          pitch: pitch + (intensity <= 2 ? randomShift(1) : randomShift(intensity)),
+          duration: duration, // Keep same duration for conservative mutation
+          velocity: clamp(velocity + randomShift(intensity), 60, 100)
+        };
+      }
+    };
 
-  // Other utility functions remain the same
-  const randomShift = (max) => Math.floor(Math.random() * (max * 2 + 1)) - max;
-  const randomShiftIndex = (max) => Math.floor(Math.random() * (max * 2 + 1)) - max;
-  const clamp = (val, min, max) => Math.min(max, Math.max(min, val));
+    // Other utility functions remain the same
+    const randomShift = (max) => Math.floor(Math.random() * (max * 2 + 1)) - max;
+    const randomShiftIndex = (max) => Math.floor(Math.random() * (max * 2 + 1)) - max;
+    const clamp = (val, min, max) => Math.min(max, Math.max(min, val));
 
-  const getMutationIcon = () => {
-    switch (mutationType) {
-      case 'pitch':
-        return '↕️';
-      case 'duration':
-        return '↔️';
-      case 'velocity':
-        return '📊';
-      default:
-        return '🧬';
-    }
-  };
+    const getMutationIcon = () => {
+      switch (mutationType) {
+        case 'pitch':
+          return '↕️';
+        case 'duration':
+          return '↔️';
+        case 'velocity':
+          return '📊';
+        default:
+          return '🧬';
+      }
+    };
 
-  return (
-    <div className="mutation-controls">
-      <div className="mutation-header">
-        <h4>Mutation Controls</h4>
-      </div>
-
-      <div className="selected-note-info">
-        {selectedIndices.length === 0 ? (
-          <div className="mutation-instruction">
-            <i className="fas fa-arrow-up"></i> Click on a note above to select it for mutation
-          </div>
-        ) : selectedIndices.length === 1 ? (
-          <div className="selected-count">
-            <span className="count">1</span>
-            <span className="label">note selected (index: {selectedIndices[0]})</span>
-          </div>
-        ) : (
-          <div className="too-many-selected">
-            <i className="fas fa-exclamation-triangle"></i> 
-            <span>Too many notes selected ({selectedIndices.length}). Please select only one note.</span>
-          </div>
-        )}
-      </div>
-
-      <div className="mutation-options">
-        <div className="control-group">
-          <label>Mutation Type:</label>
-          <div className="custom-select">
-            <select value={mutationType} onChange={(e) => setMutationType(e.target.value)}>
-              <option value="pitch">Pitch</option>
-              <option value="duration">Duration</option>
-              <option value="velocity">Volume</option>
-              <option value="all">All Properties</option>
-            </select>
-            <div className="select-icon">{getMutationIcon()}</div>
-          </div>
+    return (
+      <div className="mutation-controls">
+        <div className="mutation-header">
+          <h4>Mutation Controls</h4>
         </div>
 
-        <div className="control-group">
-          <label>Intensity: {intensity} {intensity <= 2 ? '(Minimal)' : ''}</label>
-          <div className="slider-container">
-            <input
-              type="range"
-              min="1"
-              max="10"
-              value={intensity}
-              onChange={(e) => setIntensity(parseInt(e.target.value))}
-            />
-            <div className="slider-labels">
-              <span>Subtle</span>
-              <span>Extreme</span>
+        <div className="selected-note-info">
+          {selectedIndices.length === 0 ? (
+            <div className="mutation-instruction">
+              <i className="fas fa-arrow-up"></i> Click on a note above to select it for mutation
+            </div>
+          ) : selectedIndices.length === 1 ? (
+            <div className="selected-count">
+              <span className="count">1</span>
+              <span className="label">note selected (index: {selectedIndices[0]})</span>
+            </div>
+          ) : (
+            <div className="too-many-selected">
+              <i className="fas fa-exclamation-triangle"></i> 
+              <span>Too many notes selected ({selectedIndices.length}). Please select only one note.</span>
+            </div>
+          )}
+        </div>
+
+        <div className="mutation-options">
+          <div className="control-group">
+            <label>Mutation Type:</label>
+            <div className="custom-select">
+              <select value={mutationType} onChange={(e) => setMutationType(e.target.value)}>
+                <option value="pitch">Pitch</option>
+                <option value="duration">Duration</option>
+                <option value="velocity">Volume</option>
+                <option value="all">All Properties</option>
+              </select>
+              <div className="select-icon">{getMutationIcon()}</div>
+            </div>
+          </div>
+
+          <div className="control-group">
+            <label>Intensity: {intensity} {intensity <= 2 ? '(Minimal)' : ''}</label>
+            <div className="slider-container">
+              <input
+                type="range"
+                min="1"
+                max="10"
+                value={intensity}
+                onChange={(e) => setIntensity(parseInt(e.target.value))}
+              />
+              <div className="slider-labels">
+                <span>Subtle</span>
+                <span>Extreme</span>
+              </div>
             </div>
           </div>
         </div>
+
+        <button
+          className={`action-btn mutate ${selectedIndices.length !== 1 ? 'disabled' : ''}`}
+          onClick={handleMutate}
+          disabled={selectedIndices.length !== 1}
+        >
+          <i className="fas fa-dna"></i> Apply Mutation to Selected Note
+        </button>
       </div>
-
-      <button
-        className={`action-btn mutate ${selectedIndices.length !== 1 ? 'disabled' : ''}`}
-        onClick={handleMutate}
-        disabled={selectedIndices.length !== 1}
-      >
-        <i className="fas fa-dna"></i> Apply Mutation to Selected Note
-      </button>
-    </div>
-  );
-};
-
-
-
+    );
+  };
 
   const ScoreSlider = ({ onRate, initialValue = 50 }) => {
     const [score, setScore] = useState(initialValue);
@@ -985,24 +1057,30 @@ const MutationControls = ({ genome, selectedIndices, onMutate }) => {
     return (
       <div className="countdown-modal-overlay">
         <div className="countdown-modal">
-          <h3>Mutation Submitted Successfully! 🎉</h3>
-          <p>Your contribution will help shape the next generation of melodies.</p>
+          <h3><i className="fas fa-check-circle success-icon"></i> Mutation Submitted Successfully!</h3>
+          <p className="modal-message">Your contribution will help shape the next generation of melodies.</p>
+          
           <div className="next-generation-info">
             <h4>Next Generation Update In</h4>
-            <div className="countdown-timer">{timeString}</div>
+            <div className="countdown-timer-container">
+              <div className="countdown-timer">
+                {timeString}
+              </div>
+            </div>
             <p className="countdown-info">
-              The system automatically creates new generations every 5 minutes based on the highest-rated melodies.
+              The system automatically creates new generations every 3 minutes based on the highest-rated melodies.
             </p>
           </div>
+          
           <div className="countdown-actions">
             <button 
-              className="action-btn"
+              className="action-btn primary-btn"
               onClick={() => window.location.reload()}
             >
               <i className="fas fa-flask"></i> Try Another Experiment
             </button>
             <button 
-              className="action-btn secondary"
+              className="action-btn secondary-btn"
               onClick={onClose}
             >
               <i className="fas fa-times"></i> Close
@@ -1012,38 +1090,74 @@ const MutationControls = ({ genome, selectedIndices, onMutate }) => {
       </div>
     );
   };
-
-  const CountdownDisplay = () => {
+  
+  // Updated CountdownDisplay component to show a fixed time instead of a live countdown
+  const CountdownDisplay = ({ nextUpdateTime, setShowExperimentSelection }) => {
+    // Check if the provided time is valid and in the future
+    const now = new Date();
+    let displayTime = nextUpdateTime;
+    
+    // If time is invalid or in the past, generate a time 3 minutes from now
+    if (!nextUpdateTime || nextUpdateTime <= now) {
+      displayTime = new Date(now.getTime() + 3 * 60 * 1000);
+      console.log("Generated fallback time:", displayTime);
+    }
+    
+    // Format the next update time as a fixed string (e.g., HH:MM:SS)
+    const fixedTime = displayTime ? displayTime.toLocaleTimeString() : 'Loading...';
+    
+    // Add information about experiment progress if available
+    const progressPercent = currentGenome && 
+      currentGenome.max_generations ? 
+      Math.round((currentGenome.generation / currentGenome.max_generations) * 100) : 
+      Math.round((currentGenome?.generation || 0) / 4 * 100);
+    
     return (
       <div className="countdown-display">
         <div className="countdown-content">
-          <h3>You've Already Contributed to This Experiment</h3>
-          <p>Thank you for your contribution to this generation!</p>
-          
+          <div className="countdown-header">
+            <i className="fas fa-check-circle contribution-icon"></i>
+            <h3>You've Already Contributed</h3>
+          </div>
+          <p className="contribution-thank-you">Thank you for helping shape this generation!</p>
           <div className="next-generation-info">
-            <h4>Next Generation Update In</h4>
-            <div className="countdown-timer">
-              {countdownTime || "Calculating..."}
+            <h4>Next Generation Will Be Created At</h4>
+            <div className="countdown-timer-container">
+              <div className="fixed-time">
+                {fixedTime}
+              </div>
             </div>
+            
+            <div className="experiment-progress">
+              <div className="progress-bar">
+                <div 
+                  className="progress-fill" 
+                  style={{width: `${progressPercent}%`}}
+                ></div>
+              </div>
+              <div className="progress-text">
+                {progressPercent}% complete 
+                {currentGenome?.generation >= 3 && (
+                  <span className="completion-note"> (Final generation soon!)</span>
+                )}
+              </div>
+            </div>
+            
+            <p className="countdown-info">
+              The system automatically creates new generations based on the highest-rated melodies.
+            </p>
           </div>
-          
-          <p className="countdown-message">
-            Each user can only contribute once per experiment generation. 
-            Please wait for the next generation to be created or try another experiment.
-          </p>
-          
-          <div className="countdown-actions">
-            <button 
-              className="action-btn primary-btn"
-              onClick={() => setShowExperimentSelection(true)}
-            >
-              <i className="fas fa-flask"></i> Try Another Experiment
-            </button>
-          </div>
+          <button 
+            className="action-btn experiment-btn"
+            onClick={() => setShowExperimentSelection(true)}
+            disabled={!displayTime}
+          >
+            <i className="fas fa-flask"></i> Try Another Experiment
+          </button>
         </div>
       </div>
     );
-  };
+};
 
   // --- Render ---
   if (loading && !user) {
@@ -1089,19 +1203,9 @@ const MutationControls = ({ genome, selectedIndices, onMutate }) => {
                 <div className="leaderboard-content">
                   {leaderboard.length > 0 ? (
                     leaderboard.map((entry, index) => (
-                      <div key={entry.id} className="leaderboard-entry">
-                        <div className="leaderboard-rank">#{index + 1}</div>
-                        <div className="user-avatar">
-                          {entry.username.substring(0, 2).toUpperCase()}
-                        </div>
-                        <div className="leaderboard-info">
-                          <div className="leaderboard-name">{entry.username}</div>
-                          <div className="leaderboard-stats">
-                            <i className="fas fa-lightbulb contribution-icon"></i>
-                            <span className="contribution-count">{entry.contribution_count}</span> contributions
-                          </div>
-                        </div>
-                        {index < 3 && (
+                      <div key={entry.id || index} className="leaderboard-entry">
+                        <div className="leaderboard-rank">{index + 1}</div>
+                        <div className="leaderboard-user">
                           <div className={`trophy trophy-${index + 1}`}>
                             {index === 0 ? (
                               <i className="fas fa-crown gold"></i>
@@ -1111,7 +1215,9 @@ const MutationControls = ({ genome, selectedIndices, onMutate }) => {
                               <i className="fas fa-award bronze"></i>
                             )}
                           </div>
-                        )}
+                          <div className="leaderboard-username">{entry.username}</div>
+                        </div>
+                        <div className="leaderboard-score">{Math.round(entry.score)}</div>
                       </div>
                     ))
                   ) : (
@@ -1140,7 +1246,10 @@ const MutationControls = ({ genome, selectedIndices, onMutate }) => {
                       </div>
                       
                       {countdownActive ? (
-                        <CountdownDisplay />
+                        <CountdownDisplay 
+                          nextUpdateTime={nextUpdateTime}
+                          setShowExperimentSelection={setShowExperimentSelection}
+                        />
                       ) : (
                         <>
                           <StickRoll
@@ -1277,11 +1386,15 @@ const MutationControls = ({ genome, selectedIndices, onMutate }) => {
 
       {/* FOOTER */}
       <footer className="app-footer">
-        <p>&copy; 2025 TuneBreeder - Evolving Music Together</p>
+        <p>&copy; 5 TuneBreeder - Evolving Music Together</p>
         <div className="footer-links">
+          {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
           <a href="#">About</a>
+          {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
           <a href="#">Privacy</a>
+          {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
           <a href="#">Terms</a>
+          {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
           <a href="#">Contact</a>
         </div>
       </footer>
@@ -1290,3 +1403,4 @@ const MutationControls = ({ genome, selectedIndices, onMutate }) => {
 };
 
 export default HomePage;
+

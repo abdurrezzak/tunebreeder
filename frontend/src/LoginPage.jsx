@@ -7,6 +7,9 @@ const LoginPage = () => {
   const [activeForm, setActiveForm] = useState('login'); // 'login', 'signup', or 'forgot'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
   
   // Form data states
   const [loginData, setLoginData] = useState({ email: '', password: '', remember: false });
@@ -155,10 +158,39 @@ const LoginPage = () => {
       setLoading(false);
     }
   };
-  
-  const handleGoogleLogin = () => {
-    // Redirect to Google OAuth endpoint
-    window.location.href = 'http://localhost:8000/auth/google/login';
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    try {
+      const response = await fetch('http://localhost:8000/auth/forgot-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: forgotEmail
+        }),
+      });
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.detail || 'Something went wrong');
+      }
+      
+      // Always show success, even if email doesn't exist (security)
+      setResetSent(true);
+      setTimeout(() => {
+        setShowForgotPassword(false);
+        setResetSent(false);
+      }, 5000);
+      
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Handle form submission
@@ -270,20 +302,6 @@ const LoginPage = () => {
               >
                 {loading ? 'Signing In...' : 'Sign In'}
               </button>
-              
-              <div className="separator">or continue with</div>
-              
-              <div className="social-login">
-                <div 
-                  className="social-btn google-btn"
-                  onClick={handleGoogleLogin}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M20.283 10.356h-8.327v3.451h4.792c-.446 2.193-2.313 3.453-4.792 3.453a5.27 5.27 0 0 1-5.279-5.28 5.27 5.27 0 0 1 5.279-5.279c1.259 0 2.397.447 3.29 1.178l2.6-2.599c-1.584-1.381-3.615-2.233-5.89-2.233a8.908 8.908 0 0 0-8.934 8.934 8.907 8.907 0 0 0 8.934 8.934c4.467 0 8.529-3.249 8.529-8.934 0-.528-.081-1.097-.202-1.625z" fill="#4285F4"/>
-                  </svg>
-                  <span>Continue with Google</span>
-                </div>
-              </div>
             </form>
             
             <div className="form-switch">
@@ -356,20 +374,6 @@ const LoginPage = () => {
               >
                 {loading ? 'Creating Account...' : 'Create Account'}
               </button>
-              
-              <div className="separator">or sign up with</div>
-              
-              <div className="social-login">
-                <div 
-                  className="social-btn google-btn"
-                  onClick={handleGoogleLogin}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M20.283 10.356h-8.327v3.451h4.792c-.446 2.193-2.313 3.453-4.792 3.453a5.27 5.27 0 0 1-5.279-5.28 5.27 5.27 0 0 1 5.279-5.279c1.259 0 2.397.447 3.29 1.178l2.6-2.599c-1.584-1.381-3.615-2.233-5.89-2.233a8.908 8.908 0 0 0-8.934 8.934 8.907 8.907 0 0 0 8.934 8.934c4.467 0 8.529-3.249 8.529-8.934 0-.528-.081-1.097-.202-1.625z" fill="#4285F4"/>
-                  </svg>
-                  <span>Sign up with Google</span>
-                </div>
-              </div>
             </form>
             
             <div className="form-switch">

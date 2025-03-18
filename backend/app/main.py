@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -10,10 +10,25 @@ from dotenv import load_dotenv
 from sqlalchemy import func, desc
 from datetime import datetime, timedelta
 import pytz
+from authlib.integrations.starlette_client import OAuth
+from starlette.config import Config
+from starlette.responses import RedirectResponse
+# Add this import for SessionMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 from . import models, schemas, auth, database, genomes
 from .database import engine
 from . import experiments
+# Import the cleanup function at the top of the file
+from .database_cleanup import cleanup_orphaned_genomes
+
+# Add these imports at the top
+from fastapi import BackgroundTasks
+import secrets
+from datetime import datetime, timedelta
+from email.message import EmailMessage
+import smtplib
+from pydantic import EmailStr
 
 # Load environment variables
 load_dotenv()
@@ -22,6 +37,12 @@ load_dotenv()
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="TuneBreeder API")
+
+# Add SessionMiddleware (must be before other middleware)
+app.add_middleware(
+    SessionMiddleware, 
+    secret_key=os.getenv("SECRET_KEY", "your_super_secret_key_here_change_this_in_production")
+)
 
 # Configure CORS
 origins = [
@@ -35,6 +56,24 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+schedule_time = 3 # minutes
+
+
+# Configure OAuth for Google
+config = Config('.env')  # Load from .env file or environment variables
+oauth = OAuth(config)
+
+# Register Google OAuth
+oauth.register(
+    name='google',
+    client_id=os.getenv('GOOGLE_CLIENT_ID'),
+    client_secret=os.getenv('GOOGLE_CLIENT_SECRET'),
+    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+    client_kwargs={
+        'scope': 'openid email profile'
+    }
 )
 
 # Dependency
@@ -111,7 +150,7 @@ def get_current_genome(
 # Modify the existing mutate_genome endpoint
 
 # Store the next scheduled update time
-next_scheduled_update = datetime.now(pytz.utc) + timedelta(minutes=1)
+next_scheduled_update = datetime.now(pytz.utc) + timedelta(minutes=schedule_time)
 
 @app.post("/api/genome/{genome_id}/mutate")
 def mutate_genome(
@@ -168,6 +207,7 @@ def mutate_genome(
     # Update the genome with the new mutation
     genome.data = mutation.mutation_data
     genome.score = mutation.score
+    genome.user_scored = 1  # Add this line to mark the genome as scored by a user
     
     # Update the user's contribution count
     current_user.contribution_count += 1
@@ -194,7 +234,7 @@ def mutate_genome(
                 .filter(
                     models.GenomeExperiment.experiment_id == experiment.id,
                     models.GenomeExperiment.generation == experiment.current_generation,
-                    models.Genome.score == 0
+                    models.Genome.user_scored == 0  # Changed from score == 0
                 ).exists()
             ).scalar()
 
@@ -202,6 +242,7 @@ def mutate_genome(
             # If all genomes are scored, automatically advance to next generation
             if all_scored:
                 experiments.advance_experiment_generation(db, experiment.id)
+                
     
     db.commit()
     db.refresh(db_mutation)
@@ -345,7 +386,7 @@ def get_leaderboard(
         result.append({
             "id": user_id,
             "username": username,
-            "contribution_count": contribution_count
+            "score": contribution_count
         })
     
     return result
@@ -446,6 +487,7 @@ def get_genome_from_experiment(
     
     return genome_dict
 
+import random
 @app.get("/api/genome/random")
 def get_random_genome(
     db: Session = Depends(get_db),
@@ -454,23 +496,46 @@ def get_random_genome(
     """Get a random genome from any active experiment"""
     print(f"User {current_user.id} ({current_user.username}) requesting random genome")
     
-    genome = experiments.get_random_genome_from_any_experiment(db)
+    # Get all active experiments
+    active_experiments = db.query(models.Experiment).filter(models.Experiment.completed == False).all()
+    
+    if not active_experiments:
+        raise HTTPException(status_code=404, detail="No active experiments found")
+    
+    # Filter to experiments where the user hasn't contributed to current generation
+    available_experiments = []
+    for experiment in active_experiments:
+        # Check if user has already contributed to this experiment's generation
+        existing_contribution = db.query(models.Mutation).join(
+            models.GenomeExperiment, 
+            models.Mutation.genome_id == models.GenomeExperiment.genome_id
+        ).filter(
+            models.GenomeExperiment.experiment_id == experiment.id,
+            models.GenomeExperiment.generation == experiment.current_generation,
+            models.Mutation.user_id == current_user.id
+        ).first()
+        
+        if not existing_contribution:
+            available_experiments.append(experiment)
+    
+    if not available_experiments:
+        raise HTTPException(
+            status_code=404, 
+            detail="You've already contributed to all available experiments in their current generation"
+        )
+    
+    # Select random experiment from available ones
+    selected_experiment = random.choice(available_experiments)
+    
+    # Get genome from selected experiment
+    genome = experiments.get_random_genome_from_experiment(
+        db, 
+        selected_experiment.id, 
+        selected_experiment.current_generation
+    )
+    
     if not genome:
-        print("No genomes available from any experiment")
-        raise HTTPException(status_code=404, detail="No genomes available")
-    
-    # Get experiment info
-    genome_exp = db.query(models.GenomeExperiment).filter(
-        models.GenomeExperiment.genome_id == genome.id
-    ).first()
-    
-    if not genome_exp:
-        print(f"Genome {genome.id} not associated with any experiment")
-        raise HTTPException(status_code=404, detail="Genome not associated with an experiment")
-    
-    experiment = db.query(models.Experiment).filter(
-        models.Experiment.id == genome_exp.experiment_id
-    ).first()
+        raise HTTPException(status_code=404, detail="No genomes available from selected experiment")
     
     # Convert genome data from JSON string to Python dict for response
     try:
@@ -481,17 +546,15 @@ def get_random_genome(
             "generation": genome.generation,
             "data": genome_data,
             "score": genome.score,
-            "experiment_id": experiment.id,
-            "experiment_name": experiment.name
+            "experiment_id": selected_experiment.id,
+            "experiment_name": selected_experiment.name
         }
         
-        print(f"Successfully returning genome {genome.id} from experiment {experiment.name}")
+        print(f"Successfully returning genome {genome.id} from experiment {selected_experiment.name}")
         return genome_dict
     except json.JSONDecodeError as e:
         print(f"Error decoding genome data: {e}")
         raise HTTPException(status_code=500, detail=f"Invalid genome data format: {str(e)}")
-
-
 
 @app.get("/api/genome/{genome_id}/ancestry")
 def get_genome_ancestry(
@@ -870,12 +933,16 @@ def periodic_generation_update():
         experiments_list = db.query(models.Experiment).filter(models.Experiment.completed == False).all()
         print(f"Found {len(experiments_list)} active experiments")
         
+
         for exp in experiments_list:
             print(f"Processing experiment {exp.id} (generation {exp.current_generation})")
             
-            # IMPORTANT: Use the experiment-specific function to advance the generation
-            # This ensures proper isolation between experiments
             result = experiments.advance_experiment_generation(db, exp.id)
+            
+            cleanup_result = cleanup_orphaned_genomes(db, exp.id)
+            if cleanup_result and "deleted_count" in cleanup_result:
+                print(f"Cleaned up {cleanup_result['deleted_count']} orphaned genomes from previous generations")
+
             print(f"Result for experiment {exp.id}: {result}")
             
     except Exception as e:
@@ -884,9 +951,9 @@ def periodic_generation_update():
     finally:
         db.close()
 
-# Set up the scheduler to run every 2 minutes
+# Set up the scheduler to run every n minutes
 scheduler = BackgroundScheduler()
-scheduler.add_job(periodic_generation_update, 'interval', minutes=1)
+scheduler.add_job(periodic_generation_update, 'interval', minutes=schedule_time)
 scheduler.start()
 
 @app.on_event("shutdown")
@@ -918,3 +985,186 @@ def check_user_contribution(
         }
     
     return {"has_contributed": False}
+
+# Google OAuth login route
+@app.get('/auth/google/login')
+async def google_login(request: Request):
+    redirect_uri = request.url_for('google_callback')
+    return await oauth.google.authorize_redirect(request, redirect_uri)
+
+# Google OAuth callback route
+@app.get('/auth/google/callback')
+async def google_callback(request: Request, db: Session = Depends(get_db)):
+    token = await oauth.google.authorize_access_token(request)
+    user_info = token.get('userinfo')
+    if user_info:
+        # Check if the user exists
+        db_user = auth.get_user(db, email=user_info['email'])
+        if not db_user:
+            # Create a new user
+            db_user = models.User(
+                email=user_info['email'],
+                username=user_info.get('name', user_info['email'].split('@')[0]),
+                hashed_password=auth.get_password_hash(os.urandom(24).hex())  # Random secure password
+            )
+            db.add(db_user)
+            db.commit()
+            db.refresh(db_user)
+        
+        # Create access token
+        access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = auth.create_access_token(
+            data={"sub": db_user.email}, expires_delta=access_token_expires
+        )
+        
+        # Redirect to frontend with token
+        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+        return RedirectResponse(
+            url=f"{frontend_url}/auth-callback?token={access_token}"
+        )
+    
+    # If we get here, something went wrong
+    return RedirectResponse(url="/login?error=Could not authenticate with Google")
+
+@app.post("/auth/forgot-password")
+async def forgot_password(
+    email_data: schemas.PasswordResetRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """Generate a password reset token and send a reset email"""
+    user = db.query(models.User).filter(models.User.email == email_data.email).first()
+    
+    # Always return success regardless of whether the email exists
+    # This prevents user enumeration attacks
+    if not user:
+        return {"message": "If your email is registered, you will receive a password reset link"}
+    
+    # Generate a secure token
+    reset_token = secrets.token_urlsafe(32)
+    
+    # Set expiration time (e.g., 1 hour from now)
+    expires = datetime.utcnow() + timedelta(hours=1)
+    
+    # Store the reset token in the database
+    user.reset_token = reset_token
+    user.reset_token_expires = expires
+    db.commit()
+    
+    # Send the reset email as a background task
+    background_tasks.add_task(
+        send_password_reset_email, 
+        email_data.email, 
+        reset_token
+    )
+    
+    return {"message": "If your email is registered, you will receive a password reset link"}
+
+def send_password_reset_email(email: str, token: str):
+    """Send password reset email with token using MailerSend API directly"""
+    reset_url = f"http://localhost:3000/reset-password?token={token}"
+    
+    try:
+        import requests
+        import json
+        
+        # MailerSend credentials - store these in environment variables
+        mailersend_api_key = os.getenv("MAILERSEND_API_KEY", "mlsn.73508ecd9eaf7f1a64c59cb054cdada396fd733e836342748c73064db8da2bbe")
+        mailersend_from_email = os.getenv("MAILERSEND_FROM_EMAIL", "info@tunebreeder.com")
+        
+        # MailerSend API endpoint
+        url = "https://api.mailersend.com/v1/email"
+        
+        # Email content
+        payload = {
+            "from": {
+                "email": mailersend_from_email,
+                "name": "TuneBreeder Support"
+            },
+            "to": [
+                {
+                    "email": email
+                }
+            ],
+            "subject": "TuneBreeder Password Reset",
+            "text": f"""
+Hello,
+
+You requested a password reset for your TuneBreeder account.
+
+Go to this URL to reset your password: {reset_url}
+
+This link will expire in 1 hour.
+
+If you did not request a password reset, please ignore this email.
+
+Regards,
+TuneBreeder Team
+            """,
+            "html": f"""
+<html>
+    <body>
+        <h2>TuneBreeder Password Reset</h2>
+        <p>Hello,</p>
+        <p>You requested a password reset for your TuneBreeder account.</p>
+        <p><a href="{reset_url}" style="display: inline-block; background-color: #4285f4; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px;">Reset Your Password</a></p>
+        <p>Or copy and paste this URL into your browser: {reset_url}</p>
+        <p>This link will expire in 1 hour.</p>
+        <p>If you did not request a password reset, please ignore this email.</p>
+        <p>Regards,<br>TuneBreeder Team</p>
+    </body>
+</html>
+            """
+        }
+        
+        # Headers
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {mailersend_api_key}",
+            "X-Requested-With": "XMLHttpRequest"
+        }
+        
+        # Send the request
+        response = requests.post(url, headers=headers, json=payload)
+        
+        # Check response
+        if response.status_code == 202:
+            print(f"Password reset email sent to {email}, status code: {response.status_code}")
+        else:
+            print(f"Failed to send email. Status code: {response.status_code}, Response: {response.text}")
+            
+    except Exception as e:
+        print(f"Failed to send email: {str(e)}")
+        
+        # For development purposes, print the reset token to console
+        print("\n====== PASSWORD RESET ======")
+        print(f"Email: {email}")
+        print(f"Reset URL: {reset_url}")
+        print(f"Token: {token}")
+        print("============================\n")
+
+@app.post("/auth/reset-password")
+async def reset_password(
+    reset_data: schemas.PasswordReset,
+    db: Session = Depends(get_db)
+):
+    """Reset user password using token"""
+    # Find user with this token
+    user = db.query(models.User).filter(
+        models.User.reset_token == reset_data.token
+    ).first()
+    
+    # Check if token exists and is valid
+    if not user or not user.reset_token_expires or user.reset_token_expires < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+    
+    # Update the password
+    user.hashed_password = auth.get_password_hash(reset_data.new_password)
+    
+    # Clear the reset token
+    user.reset_token = None
+    user.reset_token_expires = None
+    
+    db.commit()
+    
+    return {"message": "Password updated successfully"}

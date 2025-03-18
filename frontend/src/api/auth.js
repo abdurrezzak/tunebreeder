@@ -32,3 +32,16 @@ export const registerUser = async (email, username, password) => {
   
   return response.json();
 };
+
+// Add this helper function to handle Google auth callback
+export const processAuthCallback = () => {
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('token');
+  
+  if (token) {
+    localStorage.setItem('token', token);
+    return token;
+  }
+  
+  return null;
+};

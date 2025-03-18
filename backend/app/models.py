@@ -19,6 +19,8 @@ class User(Base):
     # Relationships
     mutations = relationship("Mutation", back_populates="user")
     saved_melodies = relationship("SavedMelody", back_populates="user")
+    reset_token = Column(String, nullable=True)
+    reset_token_expires = Column(DateTime, nullable=True)
 
 class Genome(Base):
     __tablename__ = "genomes"
@@ -74,7 +76,7 @@ class Experiment(Base):
     name = Column(String, index=True)
     description = Column(String, nullable=True)
     current_generation = Column(Integer, default=0)
-    max_generations = Column(Integer, default=1000)  # Default max generations
+    max_generations = Column(Integer, default=4)  # Default max generations
     best_score = Column(Float, default=0.0)
     completed = Column(Boolean, default=False)
     final_piece_name = Column(String, nullable=True)

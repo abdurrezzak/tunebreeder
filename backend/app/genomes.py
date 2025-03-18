@@ -10,19 +10,105 @@ load_dotenv()
 
 GENOME_LENGTH = int(os.getenv("GENOME_LENGTH", 64))
 INITIAL_GENOME_COUNT = int(os.getenv("INITIAL_GENOME_COUNT", 10))
-TOP_GENOMES_TO_CROSSOVER = int(os.getenv("TOP_GENOMES_TO_CROSSOVER", 5))
-GENES_TO_MUTATE = int(os.getenv("GENES_TO_MUTATE", 4))
+TOP_GENOMES_TO_CROSSOVER = int(os.getenv("TOP_GENOMES_TO_CROSSOVER", 20))
+GENES_TO_MUTATE = int(os.getenv("GENES_TO_MUTATE", 1))
 
 def create_random_genome():
-    """Create a random musical genome"""
+    """Create a random musical genome with more realistic musical properties"""
+    # Define common musical scales (C major, A minor, etc)
+    scales = {
+        'c_major': [36, 38, 40, 41, 43, 45, 47, 48, 50, 52, 53, 55, 57, 59, 60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79, 81, 83, 84],
+        'a_minor': [33, 35, 36, 38, 40, 41, 43, 45, 47, 48, 50, 52, 53, 55, 57, 59, 60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79, 81],
+        'g_major': [31, 33, 35, 36, 38, 40, 42, 43, 45, 47, 48, 50, 52, 54, 55, 57, 59, 60, 62, 64, 66, 67, 69, 71, 72, 74, 76, 78, 79],
+        'pentatonic': [36, 38, 43, 45, 47, 48, 50, 55, 57, 59, 60, 62, 67, 69, 71, 72, 74, 79, 81, 83, 84]
+    }
+    
+    # Choose a random scale
+    chosen_scale = random.choice(list(scales.values()))
+    
+    # Common note durations in 4/4 time (quarter = 1)
+    durations = [0.25, 0.5, 0.5, 0.5, 0.5, 0.75, 1, 1, 1, 1.5, 2]  # Weighted toward common values
+    
+    # Segment the melody into phrases (typically 4 measures in 4/4 time)
+    phrase_length = 16  # 4 measures of quarter notes
+    num_phrases = GENOME_LENGTH // phrase_length
+    remainder = GENOME_LENGTH % phrase_length
+    
     genome = []
-    for _ in range(GENOME_LENGTH):
-        gene = {
-            "pitch": random.randint(36, 84),  # C2 to C6 range
-            "duration": random.choice([0.25, 0.5, 1, 2]),  # Quarter, half, whole notes
-            "velocity": random.randint(60, 100)  # Volume/intensity
-        }
-        genome.append(gene)
+    current_pitch_index = random.randint(0, len(chosen_scale) - 10)  # Start in a reasonable range
+    
+    # Create each phrase with some musical coherence
+    for phrase in range(num_phrases + (1 if remainder > 0 else 0)):
+        # For each phrase, decide a melodic pattern
+        pattern_type = random.choice(['ascending', 'descending', 'arpeggios', 'stable', 'wave'])
+        
+        # Start with velocity in a reasonable range
+        current_velocity = random.randint(70, 85)
+        
+        # Determine phrase length (last one might be shorter)
+        current_phrase_length = phrase_length if phrase < num_phrases else remainder
+        
+        # Create notes for this phrase
+        for i in range(current_phrase_length):
+            # Adjust pitch based on pattern
+            if pattern_type == 'ascending':
+                # Generally trending upward
+                step = random.choices([-1, 0, 1, 2], weights=[1, 3, 5, 1])[0]
+            elif pattern_type == 'descending':
+                # Generally trending downward
+                step = random.choices([-2, -1, 0, 1], weights=[1, 5, 3, 1])[0]
+            elif pattern_type == 'arpeggios':
+                # Bigger jumps (arpeggios)
+                step = random.choice([-4, -2, 0, 2, 4])
+            elif pattern_type == 'stable':
+                # Mostly staying in place
+                step = random.choices([-1, 0, 0, 0, 1], weights=[1, 3, 3, 3, 1])[0]
+            else:  # 'wave'
+                # Alternating up and down
+                step = 1 if i % 2 == 0 else -1
+            
+            # Adjust the pitch index but keep within scale bounds
+            current_pitch_index = max(0, min(len(chosen_scale) - 1, current_pitch_index + step))
+            pitch = chosen_scale[current_pitch_index]
+            
+            # Adjust velocity to create natural dynamics
+            # End of phrases often softer, beginnings stronger
+            velocity_change = 0
+            if i == 0:  # Phrase beginning
+                velocity_change = random.randint(0, 5)  # Slightly stronger
+            elif i >= current_phrase_length - 2:  # Phrase ending
+                velocity_change = random.randint(-5, -1)  # Slightly softer
+            else:
+                velocity_change = random.randint(-2, 2)  # Small random changes
+                
+            current_velocity = max(60, min(95, current_velocity + velocity_change))
+            
+            # For the final note of each phrase, prefer longer durations
+            if i == current_phrase_length - 1:
+                duration = random.choice([0.5, 1, 1, 1.5, 2])  # Weight toward longer notes
+            else:
+                duration = random.choice(durations)
+                
+            gene = {
+                "pitch": pitch,
+                "duration": duration,
+                "velocity": current_velocity
+            }
+            genome.append(gene)
+            
+            # Special case for final note of the entire melody
+            if phrase == num_phrases and i == current_phrase_length - 1:
+                # Often end on root note with longer duration
+                genome[-1]["duration"] = 2  # End with a longer note
+                # Try to end on a root note (C, A, G depending on scale)
+                if random.random() < 0.7:  # 70% chance
+                    root_candidates = [36, 48, 60, 72, 84] if chosen_scale == scales['c_major'] else \
+                                     [33, 45, 57, 69, 81] if chosen_scale == scales['a_minor'] else \
+                                     [31, 43, 55, 67, 79]  # G major
+                    # Find closest root note
+                    closest_root = min(root_candidates, key=lambda x: abs(x - pitch))
+                    genome[-1]["pitch"] = closest_root
+    
     return json.dumps(genome)
 
 

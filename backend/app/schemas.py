@@ -114,3 +114,11 @@ class ExperimentInDB(ExperimentBase):
 
 class Experiment(ExperimentInDB):
     total_contributions: int = 0
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+    
+class PasswordReset(BaseModel):
+    token: str
+    new_password: str

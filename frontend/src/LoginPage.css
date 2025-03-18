@@ -522,3 +522,65 @@ input[type="password"]:focus {
     right: 1rem;
   }
 }
+
+/* Add these styles for the forgot password feature */
+.forgot-password-link {
+  text-align: right;
+  margin-top: -15px;
+  margin-bottom: 15px;
+}
+
+.text-button {
+  background: none;
+  border: none;
+  color: #4285f4;
+  cursor: pointer;
+  font-size: 14px;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.text-button:hover {
+  color: #3367d6;
+}
+
+.forgot-password-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.forgot-password-modal {
+  background: white;
+  padding: 25px;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 400px;
+  position: relative;
+}
+
+.close-button {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #555;
+}
+
+.success-message {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+  padding: 12px;
+  border-radius: 4px;
+  margin-top: 15px;
+}

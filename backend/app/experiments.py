@@ -189,64 +189,62 @@ def advance_experiment_generation(db: Session, experiment_id: int):
         
         print(f"Advancing experiment {experiment_id} from generation {experiment.current_generation}")
         
-        # IMPORTANT: Only get genomes from THIS experiment's current generation
-        current_gen_genomes = db.query(models.Genome).join(
+        # Get genomes for the CURRENT generation of this experiment
+        all_genomes = db.query(models.Genome).join(
             models.GenomeExperiment,
             models.GenomeExperiment.genome_id == models.Genome.id
         ).filter(
             models.GenomeExperiment.experiment_id == experiment_id,
-            models.GenomeExperiment.generation == experiment.current_generation
+            models.GenomeExperiment.generation == experiment.current_generation  # Add this filter
         ).all()
         
-        print(f"Found {len(current_gen_genomes)} genomes in experiment {experiment_id} generation {experiment.current_generation}")
+        # Calculate scored genomes (those actually scored by users)
+        scored_genomes = [g for g in all_genomes if g.user_scored == True]
+        print(f"Found {len(scored_genomes)} human-scored genomes in generation {experiment.current_generation} out of {len(all_genomes)} total genomes")
         
-        # Find human-scored genomes
-        scored_genomes = [g for g in current_gen_genomes if g.score > 0]
-        unscored_genomes = [g for g in current_gen_genomes if g.score == 0]
-        
-        print(f"Found {len(scored_genomes)} scored genomes and {len(unscored_genomes)} unscored genomes")
-        
+        # Check if we have enough human contributions to proceed
         if len(scored_genomes) == 0:
             print(f"No human-scored genomes in experiment {experiment_id} generation {experiment.current_generation}")
             return {"status": "pending", "message": "Waiting for at least one human contribution"}
         
-        # Calculate heuristic scores for unscored genomes to ensure we have enough diversity
-        for genome in unscored_genomes:
-            genome.score = genomes.heuristic_score(genome.data)
-        
-        # Get top genomes for crossover - include all available genomes but sort by score
-        all_genomes = scored_genomes + unscored_genomes
+        # Get the highest scored genomes for crossover - sort all genomes by score
+        # We can still use all genomes for selection, but require at least one human score to proceed
         top_genomes = sorted(all_genomes, key=lambda g: g.score, reverse=True)[:genomes.TOP_GENOMES_TO_CROSSOVER]
         
         if len(top_genomes) < 2:
             return {"status": "error", "message": "Not enough genomes for evolution"}
         
         next_gen = experiment.current_generation + 1
-        new_genomes = []
         
         # Check if we've reached maximum generations
         if next_gen >= experiment.max_generations:
             # Complete the experiment
             experiment.completed = True
-            experiment.final_piece_name = f"Evolved Melody #{experiment.id}"
-            experiment.final_genome_id = top_genomes[0].id  # Best genome
+            experiment.final_piece_name = f"{experiment.name} - Evolution Complete"
+            
+            # Use the highest scored genome as the final piece
+            highest_scored = top_genomes[0]
+            experiment.final_genome_id = highest_scored.id
+            
             db.commit()
+            print(f"Experiment {experiment_id} completed with max generations reached. Final genome: {highest_scored.id}")
+            
             return {
                 "status": "completed", 
-                "message": "Experiment completed with max generations", 
-                "final_genome_id": top_genomes[0].id,
-                "final_score": top_genomes[0].score
+                "message": "Experiment reached maximum generations and is now complete", 
+                "final_genome_id": highest_scored.id,
+                "final_score": highest_scored.score
             }
+        
+        new_genomes = []
         
         # Create offspring through crossover of top genomes
         for _ in range(genomes.INITIAL_GENOME_COUNT):
-            # Select two different parents from top genomes
+            # Select two different parents from top_genomes
             parent1 = random.choice(top_genomes)
             parent2_candidates = [g for g in top_genomes if g.id != parent1.id]
             
             if not parent2_candidates:
-                # If no different parents (unlikely), use a different sampling approach
-                # by temporarily removing parent1 from consideration
                 temp_genomes = [g for g in top_genomes if g.id != parent1.id]
                 if not temp_genomes:
                     temp_genomes = all_genomes
@@ -257,12 +255,10 @@ def advance_experiment_generation(db: Session, experiment_id: int):
             # Perform crossover
             child_data = genomes.crossover(parent1, parent2)
             
-            
-                        # Apply a small chance of mutation to the result (10% chance)
+            # Apply a small chance of mutation to the result (10% chance)
             if random.random() < 0.1:
                 child_data = genomes.apply_mutation(child_data, num_genes=int(genomes.GENOME_LENGTH * 0.05))
-
-
+            
             # Create new genome
             genome = models.Genome(
                 generation=next_gen,
@@ -295,8 +291,8 @@ def advance_experiment_generation(db: Session, experiment_id: int):
         
         db.commit()
         
-        print(f"Successfully advanced experiment {experiment_id} to generation {next_gen} with {len(new_genomes)} genomes based on {len(scored_genomes)} human-scored genomes")
-        
+        print(f"Successfully advanced experiment {experiment_id} to generation {next_gen} with {len(new_genomes)} new genomes. Human contributions: {len(scored_genomes)}")
+
         return {
             "status": "success", 
             "message": f"Advanced to generation {next_gen} with {len(scored_genomes)} human contributions", 
@@ -306,18 +302,22 @@ def advance_experiment_generation(db: Session, experiment_id: int):
         }
     except Exception as e:
         print(f"Error advancing experiment {experiment_id}: {str(e)}")
-        # Rollback if there was an error
         db.rollback()
         return {"status": "error", "message": f"Error: {str(e)}"}
+
 
 def initialize_default_experiments(db: Session):
     """Create default experiments if none exist"""
     exp_count = db.query(models.Experiment).count()
     if exp_count == 0:
+        # Docker-style creative names for experiments
         experiments = [
-            ("Experiment 1", "A test experiment for development purposes"),
-            ("Experiment 2", "Another test experiment for development purposes"),
-            ("Experiment 3", "A test experiment for development purposes")
+            ("dreamy_beethoven", "Musical evolution inspired by classical structures with modern twists"),
+            ("serene_debussy", "Exploring impressionistic harmonies and ambient soundscapes"),
+            ("quirky_bach", "Evolving complex counterpoint with unexpected rhythmic variations"),
+            ("electric_vivaldi", "High-energy melodic patterns with seasonal mood progressions"),
+            ("cosmic_mozart", "Light and playful compositions with surprising harmonic turns"),
+            ("mysterious_chopin", "Emotional melodies with dark undertones and nostalgic progressions")
         ]
         
         for name, description in experiments:

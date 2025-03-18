@@ -107,6 +107,34 @@ const ExperimentSelection = ({ onSelectGenome, onSelectGenomeWithContribution })
     }
   };
 
+  const handleFinalPiecePlay = async (experimentId, finalGenomeId) => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      
+      // Fetch the final genome data
+      const response = await fetch(`http://localhost:8000/api/genomes/${finalGenomeId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      if (!response.ok) throw new Error('Failed to fetch final piece');
+      
+      const genomeData = await response.json();
+      
+      // Pass the genome to the parent with a special flag indicating it's a final piece
+      onSelectGenome({
+        ...genomeData,
+        isFinalPiece: true,
+        experimentId: experimentId
+      });
+    } catch (err) {
+      console.error('Error fetching final piece:', err);
+      setError(`Failed to load final piece: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Function to get experiment icon based on name
   const getExperimentIcon = (name) => {
     if (name.toLowerCase().includes('experiment 1')) {
@@ -132,6 +160,13 @@ const ExperimentSelection = ({ onSelectGenome, onSelectGenomeWithContribution })
       return "A musical evolutionary experiment";
     }
   };
+
+  const calculateProgress = (experiment) => {
+    const maxGen = experiment.max_generations || 4;
+    
+    return Math.min(100, Math.round(((experiment.current_generation + 1) / maxGen) * 100));
+  };
+
 
   if (loading) {
     return (
@@ -212,17 +247,7 @@ const ExperimentSelection = ({ onSelectGenome, onSelectGenomeWithContribution })
                 </div>
               </div>
               
-              <div className="experiment-progress">
-                <div className="progress-bar">
-                  <div 
-                    className="progress-fill" 
-                    style={{width: `${(experiment.current_generation / (experiment.max_generations || 1000)) * 100}%`}}
-                  ></div>
-                </div>
-                <div className="progress-text">
-                  {Math.round((experiment.current_generation / (experiment.max_generations || 1000)) * 100)}% complete
-                </div>
-              </div>
+                
               
               {!experiment.completed && (
                 <button 
@@ -236,7 +261,10 @@ const ExperimentSelection = ({ onSelectGenome, onSelectGenomeWithContribution })
               {experiment.completed && (
                 <div className="experiment-final">
                   <p><i className="fas fa-trophy"></i> Final piece created: <strong>{experiment.final_piece_name || `Experiment ${experiment.id} Result`}</strong></p>
-                  <button className="view-final-btn">
+                  <button 
+                    className="view-final-btn"
+                    onClick={() => handleFinalPiecePlay(experiment.id, experiment.final_genome_id)}
+                  >
                     <i className="fas fa-play"></i> Listen to Final Piece
                   </button>
                 </div>

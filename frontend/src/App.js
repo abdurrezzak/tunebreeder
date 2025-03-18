@@ -4,7 +4,11 @@ import LoginPage from './LoginPage';
 import HomePage from './HomePage';
 import MyTunes from './MyTunes';
 import Compare from './Compare';
+import MelodyMutate from './MelodyMutate';
 import { ThemeProvider } from './context/ThemeContext';
+import AuthCallback from './AuthCallback';
+import ResetPasswordPage from './ResetPasswordPage';
+
 
 const App = () => {
   // Check if user is logged in
@@ -33,6 +37,7 @@ const App = () => {
               <HomePage />
             </ProtectedRoute>
           } />
+          <Route path="/auth-callback" element={<AuthCallback />} />
           <Route path="/my-tunes" element={
             <ProtectedRoute>
               <MyTunes />
@@ -46,6 +51,11 @@ const App = () => {
           <Route path="/compare" element={
             <ProtectedRoute>
               <Compare />
+            </ProtectedRoute>
+          } />
+          <Route path="/mutate" element={
+            <ProtectedRoute>
+              <MelodyMutate />
             </ProtectedRoute>
           } />
           
@@ -64,6 +74,8 @@ const App = () => {
               </button>
             </div>
           } />
+
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
         </Routes>
       </Router>
     </ThemeProvider>

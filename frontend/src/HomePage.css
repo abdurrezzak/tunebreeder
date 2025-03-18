@@ -1812,6 +1812,10 @@
     margin-top: 20px;
   }
 
+
+  
+
+
   /* Countdown Modal */
   .countdown-modal-overlay {
     position: fixed;
@@ -1819,12 +1823,11 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(0, 0, 0, 0.6);
+    background-color: rgba(0, 0, 0, 0.5); /* Solid overlay instead of blurred */
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 1000;
-    backdrop-filter: blur(3px);
   }
   
   .countdown-modal {
@@ -1836,6 +1839,8 @@
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
     text-align: center;
     animation: modal-appear 0.3s ease-out;
+    backdrop-filter: none;
+    filter: none;
   }
   
   .dark-mode .countdown-modal {
@@ -1863,12 +1868,14 @@
   }
   
   .countdown-timer {
-    font-size: 3rem;
+    font-size: 1.5rem;
     font-weight: bold;
     color: var(--primary);
     margin: 1rem 0;
     font-variant-numeric: tabular-nums;
     letter-spacing: 2px;
+    backdrop-filter: none;
+    filter: none;
   }
   
   .countdown-info {
@@ -2023,3 +2030,317 @@
     border: 1px solid var(--border-color);
   }
 
+/* Enhanced Countdown Styles */
+
+/* Overlay for the modal */
+.countdown-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+/* Modal container */
+.countdown-modal {
+  background: var(--card-background, #ffffff);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.2);
+  padding: 2.5rem;
+  width: 90%;
+  max-width: 500px;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  animation: modalFadeIn 0.4s ease-out forwards;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Success icon */
+.countdown-modal h3 .success-icon,
+.countdown-display .contribution-icon {
+  color: #4CAF50;
+  margin-right: 10px;
+  font-size: 1.3em;
+}
+
+.countdown-modal h3 {
+  font-size: 1.6rem;
+  margin-bottom: 0.8rem;
+  color: var(--text, #333);
+}
+
+.modal-message {
+  font-size: 1.1rem;
+  color: var(--text-secondary, #666);
+  margin-bottom: 2rem;
+}
+
+/* Display in the genome card */
+.countdown-display {
+  background: var(--card-background, #fff);
+  border-radius: 12px;
+  margin: 1rem 0;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.countdown-content {
+  padding: 2rem;
+}
+
+.countdown-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.countdown-header h3 {
+  font-size: 1.4rem;
+  margin: 0;
+  color: var(--text, #333);
+}
+
+.contribution-thank-you {
+  color: var(--primary, #6c63ff);
+  font-size: 1.1rem;
+  font-weight: 500;
+  margin-bottom: 2rem;
+}
+
+/* Timer styling for both components */
+.next-generation-info {
+  margin: 2rem 0;
+}
+
+.next-generation-info h4,
+.countdown-timer-section h4 {
+  color: var(--text-secondary, #666);
+  font-size: 1.1rem;
+  font-weight: 500;
+  margin-bottom: 0.8rem;
+}
+
+.countdown-timer-container {
+  display: flex;
+  justify-content: center;
+  margin: 1rem 0;
+}
+
+.countdown-timer {
+  background: linear-gradient(135deg, var(--primary, #6c63ff), var(--primary-dark, #5046e4));
+  color: white;
+  font-weight: bold;
+  font-size: 2rem;
+  padding: 0.8rem 2rem;
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(108, 99, 255, 0.3);
+  min-width: 120px;
+  text-align: center;
+  letter-spacing: 2px;
+}
+
+.countdown-info {
+  color: var(--text-secondary, #666);
+  font-size: 0.95rem;
+  margin-top: 1rem;
+}
+
+/* Progress bar */
+.countdown-progress {
+  width: 100%;
+  height: 6px;
+  background: rgba(108, 99, 255, 0.2);
+  border-radius: 3px;
+  margin: 1rem 0 2rem;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(135deg, var(--primary, #6c63ff), var(--primary-dark, #5046e4));
+  border-radius: 3px;
+  transition: width 1s linear;
+}
+
+/* Message box styling */
+.countdown-message-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: rgba(108, 99, 255, 0.08);
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+}
+
+.countdown-message-box i {
+  color: var(--primary, #6c63ff);
+  font-size: 1.1rem;
+  margin-top: 3px;
+}
+
+.countdown-message-box p {
+  color: var(--text, #333);
+  font-size: 0.95rem;
+  margin: 0;
+  text-align: left;
+}
+
+/* Button styling */
+.countdown-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 1.5rem;
+}
+
+.experiment-btn {
+  background: var(--primary, #6c63ff);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 0.8rem 1.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 auto;
+  transition: all 0.2s;
+}
+
+.experiment-btn:hover {
+  background: var(--primary-dark, #5046e4);
+  transform: translateY(-2px);
+}
+
+.primary-btn {
+  background: var(--primary, #6c63ff);
+  color: white;
+}
+
+.primary-btn:hover {
+  background: var(--primary-dark, #5046e4);
+}
+
+.secondary-btn {
+  background: rgba(108, 99, 255, 0.1);
+  color: var(--primary, #6c63ff);
+}
+
+.secondary-btn:hover {
+  background: rgba(108, 99, 255, 0.2);
+}
+
+/* Dark mode support */
+.dark-mode .countdown-modal,
+.dark-mode .countdown-display {
+  background: var(--card-background, #2d2d2d);
+}
+
+.dark-mode .countdown-message-box {
+  background: rgba(108, 99, 255, 0.15);
+}
+
+.dark-mode .secondary-btn {
+  background: rgba(108, 99, 255, 0.2);
+}
+
+.dark-mode .secondary-btn:hover {
+  background: rgba(108, 99, 255, 0.3);
+}
+
+
+/* Genome title styles */
+.genome-title {
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.genome-title h3 {
+  font-size: 1.6rem;
+  color: var(--primary);
+  margin-bottom: 0.5rem;
+}
+
+.genome-subtitle {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.genome-id, .genome-generation {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.genome-id i, .genome-generation i {
+  font-size: 0.9rem;
+  color: var(--text-tertiary);
+}
+
+.loading-spinner.small {
+  width: 20px;
+  height: 20px;
+  border-width: 2px;
+  margin-right: 10px;
+}
+
+.wait-notification.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  background: rgba(108, 99, 255, 0.1);
+  border-radius: 8px;
+}
+
+.mini-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(108, 99, 255, 0.3);
+  border-top-color: var(--primary, #6c63ff);
+  border-radius: 50%;
+  animation: spin 1s infinite linear;
+  margin-right: 10px;
+}
+
+.countdown-ended {
+  color: var(--primary, #6c63ff);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.7; }
+  50% { opacity: 1; }
+  100% { opacity: 0.7; }
+}
